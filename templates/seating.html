@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Your Seats - Gala Seating</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 16px 16px 0 0;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f0f4ff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin-top: 15px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            background: white;
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+        }
+
+        .tables-section {
+            overflow-y: auto;
+            max-height: calc(100vh - 250px);
+        }
+
+        .tables-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .table-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .table-card.full {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+
+        .table-card.blocked {
+            background: #fee2e2;
+            border-color: #ef4444;
+            opacity: 0.7;
+        }
+
+        .table-card:hover:not(.full):not(.blocked) {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .table-number {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .table-capacity {
+            font-size: 14px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .table-capacity.available {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .table-capacity.filling {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .table-capacity.full {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .occupants-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .occupant-item {
+            padding: 6px 0;
+            color: #555;
+            font-size: 13px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .occupant-item:last-child {
+            border-bottom: none;
+        }
+
+        .occupant-item.my-assignment {
+            background: #dbeafe;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: #1e40af;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .no-occupants {
+            color: #9ca3af;
+            font-size: 13px;
+            font-style: italic;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .sidebar {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 250px);
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .guest-assignment {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+
+        .guest-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .ticket-number {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .table-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .table-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .submit-section {
+            background: white;
+            border-radius: 0 0 16px 16px;
+            padding: 20px 30px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .close-btn {
+            width: 100%;
+            padding: 16px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .close-btn:hover {
+            background: #f0f4ff;
+            transform: translateY(-2px);
+        }
+
+        .delete-assignment-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .delete-assignment-btn:hover {
+            background: #dc2626;
+        }
+
+        .delete-assignment-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .assigned-indicator {
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 6px;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                top: 0;
+                max-height: none;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .tables-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+        }
+
+        .update-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            transform: translateY(-100px);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+
+        .update-indicator.show {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="update-indicator" id="updateIndicator">
+        ✓ Tables updated
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎊 Select Your Seats</h1>
+            <p class="subtitle">Assign each person in your party to a table. Updates in real-time!</p>
+            <div class="connection-status">
+                <div class="status-dot"></div>
+                <span>Live updates active</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="tables-section">
+                <div id="tablesGrid" class="tables-grid">
+                    <!-- Tables will be loaded here -->
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <h2>Your Party ({{ guests|length }})</h2>
+                <div id="errorMessage" class="error-message"></div>
+                
+                {% for guest in guests %}
+                <div class="guest-assignment" data-ticket="{{ guest.ticket_number }}">
+                    <div class="guest-name">{{ guest.full_name }}</div>
+                    <div class="ticket-number">{{ guest.ticket_number }}</div>
+                    
+                    <div class="current-assignment" style="display: none;">
+                        <div class="assigned-indicator">
+                            ✓ Assigned to <span class="assigned-table-num"></span>
+                        </div>
+                        <button type="button" class="delete-assignment-btn" data-ticket="{{ guest.ticket_number }}">
+                            🗑️ Delete Assignment
+                        </button>
+                    </div>
+                    
+                    <div class="table-selector">
+                        <select class="table-select" data-ticket="{{ guest.ticket_number }}" data-name="{{ guest.full_name }}">
+                            <option value="">Choose a table...</option>
+                            {% for i in range(1, total_tables + 1) %}
+                            <option value="{{ i }}">Table {{ i }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="submit-section">
+            <button type="button" class="submit-btn" id="submitBtn" disabled>
+                Confirm Seat Assignments
+            </button>
+            <button type="button" class="close-btn" id="closeBtn" onclick="closePage()">
+                Close Page
+            </button>
+        </div>
+    </div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+        let tablesData = [];
+        let userAssignments = {}; // Track user's current assignments
+
+        // Get list of user's ticket numbers
+        const userTickets = Array.from(document.querySelectorAll('.table-select')).map(s => s.dataset.ticket);
+
+        // Socket connection handlers
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+        });
+
+        // Real-time table updates
+        socket.on('table_update', function(data) {
+            console.log('Received table update');
+            tablesData = data.tables;
+            renderTables();
+            showUpdateIndicator();
+            updateTableSelects();
+            updateAssignmentStatus();
+        });
+
+        // Initial load
+        loadTables();
+
+        async function loadTables() {
+            try {
+                const response = await fetch('/api/get-tables');
+                const data = await response.json();
+                
+                if (data.success) {
+                    tablesData = data.tables;
+                    renderTables();
+                    updateTableSelects();
+                    updateAssignmentStatus();
+                }
+            } catch (error) {
+                console.error('Failed to load tables:', error);
+            }
+        }
+
+        function renderTables() {
+            const grid = document.getElementById('tablesGrid');
+            grid.innerHTML = '';
+
+            tablesData.forEach(table => {
+                const card = document.createElement('div');
+                let cardClass = 'table-card';
+                
+                if (table.is_blocked) {
+                    cardClass += ' blocked';
+                } else if (table.is_full) {
+                    cardClass += ' full';
+                }
+                
+                card.className = cardClass;
+                
+                let capacityClass = 'available';
+                let statusLabel = '';
+                
+                if (table.is_blocked) {
+                    capacityClass = 'full';
+                    statusLabel = `🚫 ${table.block_reason || 'Reserved'}`;
+                } else if (table.is_full) {
+                    capacityClass = 'full';
+                    statusLabel = `${table.occupied}/${table.capacity}`;
+                } else if (table.occupied > table.capacity * 0.6) {
+                    capacityClass = 'filling';
+                    statusLabel = `${table.occupied}/${table.capacity}`;
+                } else {
+                    statusLabel = `${table.occupied}/${table.capacity}`;
+                }
+
+                let occupantsList = '';
+                if (table.is_blocked) {
+                    occupantsList = `<div class="no-occupants">Table blocked by admin</div>`;
+                } else if (table.occupants.length > 0) {
+                    occupantsList = table.occupants.map(o => {
+                        // Check if this is the current user's assignment
+                        const isUserAssignment = userTickets.includes(o.ticket);
+                        const highlightClass = isUserAssignment ? ' my-assignment' : '';
+                        return `<div class="occupant-item${highlightClass}">👤 ${o.name}${isUserAssignment ? ' (You)' : ''}</div>`;
+                    }).join('');
+                } else {
+                    occupantsList = '<div class="no-occupants">No guests assigned yet</div>';
+                }
+
+                card.innerHTML = `
+                    <div class="table-header">
+                        <div class="table-number">Table ${table.number}</div>
+                        <div class="table-capacity ${capacityClass}">
+                            ${statusLabel}
+                        </div>
+                    </div>
+                    <div class="occupants-list">
+                        ${occupantsList}
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function updateAssignmentStatus() {
+            // Check each user ticket to see if it's already assigned
+            userTickets.forEach(ticket => {
+                let assignedTable = null;
+                
+                // Find if this ticket is assigned to any table
+                tablesData.forEach(table => {
+                    const found = table.occupants.find(o => o.ticket === ticket);
+                    if (found) {
+                        assignedTable = table.number;
+                    }
+                });
+                
+                const guestDiv = document.querySelector(`.guest-assignment[data-ticket="${ticket}"]`);
+                if (guestDiv) {
+                    const currentAssignment = guestDiv.querySelector('.current-assignment');
+                    const tableSelector = guestDiv.querySelector('.table-selector');
+                    const assignedTableSpan = guestDiv.querySelector('.assigned-table-num');
+                    
+                    if (assignedTable) {
+                        // Already assigned - show delete button
+                        userAssignments[ticket] = assignedTable;
+                        currentAssignment.style.display = 'block';
+                        tableSelector.style.display = 'none';
+                        assignedTableSpan.textContent = `Table ${assignedTable}`;
+                    } else {
+                        // Not assigned - show selector
+                        delete userAssignments[ticket];
+                        currentAssignment.style.display = 'none';
+                        tableSelector.style.display = 'block';
+                    }
+                }
+            });
+            
+            checkFormComplete();
+        }
+
+        function updateTableSelects() {
+            const selects = document.querySelectorAll('.table-select');
+            
+            selects.forEach(select => {
+                const currentValue = select.value;
+                const options = select.querySelectorAll('option[value]');
+                
+                options.forEach(option => {
+                    const tableNum = parseInt(option.value);
+                    if (!tableNum) return;
+                    
+                    const tableData = tablesData.find(t => t.number === tableNum);
+                    if (tableData) {
+                        // Disable if blocked, full, or currently selected
+                        const isBlocked = tableData.is_blocked;
+                        const isFull = tableData.is_full;
+                        
+                        option.disabled = (isBlocked || isFull) && currentValue != tableNum;
+                        
+                        // Update text
+                        let status = '';
+                        if (isBlocked) {
+                            status = ` (BLOCKED - ${tableData.block_reason || 'Reserved'})`;
+                        } else if (isFull) {
+                            status = ' (FULL)';
+                        } else {
+                            status = ` (${tableData.available} seats left)`;
+                        }
+                        option.textContent = `Table ${tableNum}${status}`;
+                    }
+                });
+            });
+
+            checkFormComplete();
+        }
+
+        function showUpdateIndicator() {
+            const indicator = document.getElementById('updateIndicator');
+            indicator.classList.add('show');
+            
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+
+        // Monitor select changes
+        document.querySelectorAll('.table-select').forEach(select => {
+            select.addEventListener('change', checkFormComplete);
+        });
+
+        // Delete assignment handlers
+        document.querySelectorAll('.delete-assignment-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const ticket = this.dataset.ticket;
+                
+                if (!confirm('Delete this seat assignment?')) {
+                    return;
+                }
+                
+                this.disabled = true;
+                this.textContent = 'Deleting...';
+                
+                try {
+                    const response = await fetch('/api/delete-assignment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ ticket_number: ticket })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Will be updated via WebSocket
+                        showUpdateIndicator();
+                    } else {
+                        showError(data.error || 'Failed to delete assignment');
+                        this.disabled = false;
+                        this.textContent = '🗑️ Delete Assignment';
+                    }
+                } catch (error) {
+                    showError('Connection error. Please try again.');
+                    this.disabled = false;
+                    this.textContent = '🗑️ Delete Assignment';
+                }
+            });
+        });
+
+        function checkFormComplete() {
+            // Check if all tickets are either assigned OR have a selection
+            const allHandled = userTickets.every(ticket => {
+                const select = document.querySelector(`.table-select[data-ticket="${ticket}"]`);
+                return userAssignments[ticket] || (select && select.value !== '');
+            });
+            
+            // Enable submit only if there are NEW selections to submit
+            const hasNewSelections = Array.from(document.querySelectorAll('.table-select'))
+                .some(s => s.value !== '' && s.style.display !== 'none');
+            
+            document.getElementById('submitBtn').disabled = !hasNewSelections;
+        }
+
+        // Submit assignments
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            const selects = document.querySelectorAll('.table-select');
+            const assignments = [];
+
+            selects.forEach(select => {
+                // Only include visible selects with values
+                if (select.value && select.parentElement.style.display !== 'none') {
+                    assignments.push({
+                        ticket_number: select.dataset.ticket,
+                        full_name: select.dataset.name,
+                        table_number: parseInt(select.value)
+                    });
+                }
+            });
+
+            if (assignments.length === 0) {
+                showError('Please select tables for your guests');
+                return;
+            }
+
+            // Disable button
+            this.disabled = true;
+            this.textContent = 'Processing...';
+
+            try {
+                const response = await fetch('/api/assign-seats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ assignments })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show success message
+                    showSuccessMessage();
+                    
+                    // Wait 2 seconds, then reload page
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showError(data.error || 'Assignment failed');
+                    this.disabled = false;
+                    this.textContent = 'Confirm Seat Assignments';
+                }
+            } catch (error) {
+                showError('Connection error. Please try again.');
+                this.disabled = false;
+                this.textContent = 'Confirm Seat Assignments';
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            setTimeout(() => {
+                errorDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        function showSuccessMessage() {
+            // Create success overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'successOverlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.3s;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    border-radius: 16px;
+                    padding: 40px;
+                    text-align: center;
+                    max-width: 400px;
+                    animation: scaleIn 0.3s;
+                ">
+                    <div style="
+                        width: 80px;
+                        height: 80px;
+                        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0 auto 20px;
+                        font-size: 48px;
+                    ">✓</div>
+                    <h2 style="
+                        color: #333;
+                        font-size: 24px;
+                        margin-bottom: 10px;
+                    ">Success!</h2>
+                    <p style="
+                        color: #666;
+                        font-size: 16px;
+                    ">Your seats have been confirmed.<br>Page will refresh...</p>
+                </div>
+            `;
+            
+            // Add animations
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scaleIn {
+                    from { transform: scale(0.8); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            document.body.appendChild(overlay);
+        }
+
+        function closePage() {
+            // Create farewell overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.3s;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    border-radius: 16px;
+                    padding: 50px;
+                    text-align: center;
+                    max-width: 500px;
+                    animation: scaleIn 0.3s;
+                ">
+                    <div style="
+                        font-size: 64px;
+                        margin-bottom: 20px;
+                    ">🎊</div>
+                    <h2 style="
+                        color: #333;
+                        font-size: 28px;
+                        margin-bottom: 15px;
+                        font-weight: 700;
+                    ">Thank You!</h2>
+                    <p style="
+                        color: #666;
+                        font-size: 18px;
+                        line-height: 1.6;
+                        margin-bottom: 20px;
+                    ">Your seats are confirmed.<br>We look forward to seeing you at the gala!</p>
+                    <p style="
+                        color: #667eea;
+                        font-size: 20px;
+                        font-weight: 600;
+                    ">Have a wonderful time! 🥂</p>
+                    <p style="
+                        color: #999;
+                        font-size: 14px;
+                        margin-top: 20px;
+                    ">This window will close in 3 seconds...</p>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            // Close window after 3 seconds
+            setTimeout(() => {
+                window.close();
+                // If window.close() doesn't work (some browsers block it), redirect to home
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

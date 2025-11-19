@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gala Seating Registration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .guest-entries {
+            margin-bottom: 20px;
+        }
+
+        .guest-entry {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .guest-entry h3 {
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .remove-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .remove-btn:hover {
+            background: #dc2626;
+            transform: scale(1.1);
+        }
+
+        .add-guest-btn {
+            width: 100%;
+            padding: 12px;
+            background: #f3f4f6;
+            border: 2px dashed #9ca3af;
+            border-radius: 8px;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .add-guest-btn:hover {
+            background: #e5e7eb;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎊 Gala Seating Registration</h1>
+        <p class="subtitle">Register your tickets to select your seats</p>
+
+        <div class="info-box">
+            <p><strong>Instructions:</strong> Enter the full name and ticket number for each person in your party. You'll be able to assign table seats in the next step.</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="registrationForm">
+            <div id="guestEntries" class="guest-entries">
+                <!-- Guest entries will be added here -->
+            </div>
+
+            <button type="button" class="add-guest-btn" id="addGuestBtn">
+                <span>➕</span>
+                <span>Add Another Person</span>
+            </button>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                Continue to Seat Selection →
+            </button>
+        </form>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Validating tickets...</p>
+        </div>
+    </div>
+
+    <script>
+        let guestCount = 0;
+
+        // Add initial guest entry
+        addGuestEntry();
+
+        // Add guest entry
+        document.getElementById('addGuestBtn').addEventListener('click', function() {
+            addGuestEntry();
+        });
+
+        function addGuestEntry() {
+            guestCount++;
+            const entriesDiv = document.getElementById('guestEntries');
+            
+            const entryDiv = document.createElement('div');
+            entryDiv.className = 'guest-entry';
+            entryDiv.id = `guest-${guestCount}`;
+            
+            entryDiv.innerHTML = `
+                <h3>Person ${guestCount}</h3>
+                ${guestCount > 1 ? '<button type="button" class="remove-btn" onclick="removeGuest(' + guestCount + ')">×</button>' : ''}
+                <div class="form-group">
+                    <label for="name-${guestCount}">Full Name</label>
+                    <input type="text" id="name-${guestCount}" name="full_name" required placeholder="e.g., John Smith">
+                </div>
+                <div class="form-group">
+                    <label for="ticket-${guestCount}">Ticket Number</label>
+                    <input type="text" id="ticket-${guestCount}" name="ticket_number" required placeholder="e.g., GALA-0001" style="text-transform: uppercase;">
+                </div>
+            `;
+            
+            entriesDiv.appendChild(entryDiv);
+        }
+
+        function removeGuest(id) {
+            const element = document.getElementById(`guest-${id}`);
+            if (element) {
+                element.remove();
+                renumberGuests();
+            }
+        }
+
+        function renumberGuests() {
+            const entries = document.querySelectorAll('.guest-entry');
+            entries.forEach((entry, index) => {
+                const heading = entry.querySelector('h3');
+                if (heading) {
+                    heading.textContent = `Person ${index + 1}`;
+                }
+            });
+        }
+
+        // Form submission
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Hide error
+            hideError();
+            
+            // Collect all ticket data
+            const entries = document.querySelectorAll('.guest-entry');
+            const tickets = [];
+            
+            for (let entry of entries) {
+                const fullName = entry.querySelector('input[name="full_name"]').value.trim();
+                const ticketNumber = entry.querySelector('input[name="ticket_number"]').value.trim().toUpperCase();
+                
+                if (!fullName || !ticketNumber) {
+                    showError('Please fill out all fields');
+                    return;
+                }
+                
+                tickets.push({
+                    full_name: fullName,
+                    ticket_number: ticketNumber
+                });
+            }
+            
+            if (tickets.length === 0) {
+                showError('Please add at least one person');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('submitBtn').disabled = true;
+            
+            try {
+                const response = await fetch('/api/validate-tickets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tickets })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Redirect to seating page
+                    window.location.href = data.redirect;
+                } else {
+                    showError(data.error || 'Validation failed');
+                    document.getElementById('loading').classList.remove('show');
+                    document.getElementById('submitBtn').disabled = false;
+                }
+            } catch (error) {
+                showError('Connection error. Please try again.');
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('submitBtn').disabled = false;
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
