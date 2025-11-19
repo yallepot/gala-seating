@@ -637,10 +637,10 @@ def lookup_ticket_api():
 
 
 # ==================== APPLICATION STARTUP ====================
-
+# Initialize database
+init_database()
 if __name__ == '__main__':
-    # Initialize database
-    init_database()
+
     
     # Get port from environment (for Render/Heroku)
     port = int(os.environ.get('PORT', 5000))
