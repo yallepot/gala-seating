@@ -648,7 +648,96 @@ def lookup_ticket_api():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ==================== USHER ROUTES ====================
 
+@app.route('/usher')
+def usher_panel():
+    """Usher panel - read-only view of assignments"""
+    return render_template('usher.html',
+        total_tables=TOTAL_TABLES,
+        seats_per_table=SEATS_PER_TABLE)
+
+
+@app.route('/api/usher/get-all-assignments', methods=['GET'])
+def usher_get_all_assignments():
+    """Get all seat assignments for usher view (read-only)"""
+    try:
+        assignments = TableAssignment.query.order_by(
+            TableAssignment.table_number,
+            TableAssignment.assigned_at
+        ).all()
+        
+        result = []
+        for assignment in assignments:
+            result.append({
+                'id': assignment.id,
+                'table_number': assignment.table_number,
+                'full_name': assignment.full_name,
+                'ticket_number': assignment.ticket_number,
+                'assigned_at': assignment.assigned_at.isoformat()
+            })
+        
+        return jsonify({'success': True, 'assignments': result})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/usher/lookup-ticket', methods=['GET'])
+def usher_lookup_ticket():
+    """Usher can look up a ticket to find table assignment"""
+    try:
+        ticket_number = request.args.get('ticket')
+        
+        if not ticket_number:
+            return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
+        
+        ticket_number = ticket_number.strip()
+        
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        
+        if not ticket:
+            return jsonify({
+                'success': True,
+                'ticket_exists': False,
+                'assignment': None
+            })
+        
+        assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
+        
+        if assignment:
+            return jsonify({
+                'success': True,
+                'ticket_exists': True,
+                'assignment': {
+                    'id': assignment.id,
+                    'ticket_number': assignment.ticket_number,
+                    'full_name': assignment.full_name,
+                    'table_number': assignment.table_number,
+                    'assigned_at': assignment.assigned_at.isoformat()
+                }
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'ticket_exists': True,
+                'assignment': None,
+                'guest_name': ticket.full_name
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/usher/get-tables', methods=['GET'])
+def usher_get_tables():
+    """Get current table status for usher view"""
+    try:
+        tables = get_table_status()
+        return jsonify({'success': True, 'tables': tables})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+        
 # ==================== APPLICATION STARTUP ====================
 init_database()
 
