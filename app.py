@@ -362,7 +362,7 @@ def assign_seats_api():
         
         session['assignments'] = assignments
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({
             'success': True,
