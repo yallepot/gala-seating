@@ -210,25 +210,10 @@
             transition: all 0.3s;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            flex: 1;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .btn-secondary {
             background: #f3f4f6;
             color: #374151;
+            flex: 1;
         }
 
         .btn-secondary:hover {
@@ -370,7 +355,6 @@
 
         <div class="actions">
             <button class="btn btn-secondary" onclick="window.location.href='/'">← Start Over</button>
-            <button class="btn btn-primary" id="confirmBtn" disabled>Confirm All Assignments</button>
         </div>
     </div>
 
@@ -388,12 +372,12 @@
 
             <div class="modal-actions">
                 <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" style="flex: 1;" onclick="confirmTableSelection()">Assign Selected</button>
+                <button class="btn btn-secondary" style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" onclick="confirmTableSelection()">Assign Selected</button>
             </div>
         </div>
     </div>
 
-    <!-- Confirmation Modal -->
+    <!-- Confirmation Modal (Cannot be dismissed) -->
     <div id="confirmationModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -407,7 +391,7 @@
 
             <div class="modal-actions">
                 <button class="btn btn-secondary" style="flex: 1;" onclick="closeConfirmationModal()">Make Changes</button>
-                <button class="btn btn-primary" style="flex: 1;" onclick="finalizeAssignments()">Confirm & Continue</button>
+                <button class="btn btn-secondary" style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" onclick="finalizeAssignments()">Confirm & Continue</button>
             </div>
         </div>
     </div>
@@ -450,6 +434,13 @@
             });
         }
 
+        // Prevent clicking outside modal to close confirmation
+        document.getElementById('confirmationModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                e.stopPropagation();
+            }
+        });
+
         // Load guests
         function loadGuests() {
             console.log('Loading guests...');
@@ -474,8 +465,6 @@
                 
                 guestsContainer.appendChild(badge);
             });
-            
-            updateConfirmButton();
         }
 
         // Load tables from API
@@ -608,16 +597,23 @@
             closeModal();
             loadGuests();
             loadTables();
+            
+            // Check if all assigned and auto-show confirmation
+            checkAndShowConfirmation();
         }
 
-        // Update confirm button
-        function updateConfirmButton() {
+        // Check if all assigned and show confirmation
+        function checkAndShowConfirmation() {
             const allAssigned = guests.every(g => assignments[g.ticket_number]);
-            document.getElementById('confirmBtn').disabled = !allAssigned;
+            if (allAssigned) {
+                setTimeout(() => {
+                    showConfirmationModal();
+                }, 500);
+            }
         }
 
         // Show confirmation modal
-        document.getElementById('confirmBtn').addEventListener('click', function() {
+        function showConfirmationModal() {
             const confirmList = document.getElementById('confirmationList');
             confirmList.innerHTML = '';
             
@@ -636,9 +632,9 @@
             });
             
             document.getElementById('confirmationModal').classList.add('show');
-        });
+        }
 
-        // Close confirmation modal
+        // Close confirmation modal (for "Make Changes")
         function closeConfirmationModal() {
             document.getElementById('confirmationModal').classList.remove('show');
         }
