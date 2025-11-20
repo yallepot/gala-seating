@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usher Dashboard - Gala Seating</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .search-section {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-result {
+            display: none;
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+
+        .search-result.show {
+            display: block;
+        }
+
+        .result-highlight {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tables-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .table-card.full {
+            background: #fef3c7;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .table-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .capacity-badge {
+            background: #e5e7eb;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .table-card.full .capacity-badge {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .occupants-list {
+            font-size: 14px;
+        }
+
+        .occupant-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .occupant-item:last-child {
+            border-bottom: none;
+        }
+
+        .occupant-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .occupant-ticket {
+            color: #667eea;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .assignments-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #f9fafb;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👔 Usher Dashboard</h1>
+            <p class="subtitle">Real-time view of gala seating assignments</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalSeated">0</div>
+                <div class="stat-label">Total Guests Seated</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="tablesOccupied">0</div>
+                <div class="stat-label">Tables Occupied</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="seatsAvailable">0</div>
+                <div class="stat-label">Seats Available</div>
+            </div>
+        </div>
+
+        <div class="search-section">
+            <h2 style="margin-bottom: 15px; color: #333;">🔍 Find Guest</h2>
+            <div class="search-box">
+                <input type="number" class="search-input" id="ticketSearch" placeholder="Enter ticket number (e.g., 123)" min="1" max="250">
+                <button class="btn btn-primary" onclick="lookupTicket()">Search</button>
+            </div>
+            <div id="searchResult" class="search-result"></div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('tables')">View by Tables</div>
+            <div class="tab" onclick="switchTab('list')">View All Assignments</div>
+        </div>
+
+        <div id="tablesView" class="tab-content active">
+            <div class="tables-grid" id="tablesGrid">
+                <!-- Tables will load here -->
+            </div>
+        </div>
+
+        <div id="listView" class="tab-content">
+            <div class="assignments-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Table</th>
+                            <th>Ticket #</th>
+                            <th>Guest Name</th>
+                            <th>Assigned At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assignmentsTable">
+                        <tr>
+                            <td colspan="4">
+                                <div class="empty-state">
+                                    <div class="empty-icon">📋</div>
+                                    <p>Loading assignments...</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let tables = [];
+        let assignments = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocket();
+            loadTables();
+            loadAssignments();
+        });
+
+        // Socket.IO connection
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
+            
+            socket.on('table_update', function(data) {
+                tables = data.tables;
+                renderTables();
+                updateStats();
+            });
+        }
+
+        // Switch tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'tables') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('tablesView').classList.add('active');
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('listView').classList.add('active');
+                loadAssignments();
+            }
+        }
+
+        // Load tables
+        async function loadTables() {
+            try {
+                const response = await fetch('/api/usher/get-tables');
+                const data = await response.json();
+                
+                if (data.success) {
+                    tables = data.tables;
+                    renderTables();
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Error loading tables:', error);
+            }
+        }
+
+        // Render tables
+        function renderTables() {
+            const grid = document.getElementById('tablesGrid');
+            grid.innerHTML = '';
+            
+            tables.forEach(table => {
+                const card = document.createElement('div');
+                card.className = 'table-card';
+                
+                if (table.is_full) {
+                    card.classList.add('full');
+                }
+                
+                let occupantsHTML = '';
+                if (table.occupants && table.occupants.length > 0) {
+                    occupantsHTML = '<div class="occupants-list">';
+                    table.occupants.forEach(occ => {
+                        occupantsHTML += `
+                            <div class="occupant-item">
+                                <div class="occupant-name">${occ.name}</div>
+                                <div class="occupant-ticket">Ticket #${occ.ticket}</div>
+                            </div>
+                        `;
+                    });
+                    occupantsHTML += '</div>';
+                } else {
+                    occupantsHTML = '<div class="empty-state" style="padding: 20px;"><p style="color: #9ca3af; font-size: 14px;">No guests assigned</p></div>';
+                }
+                
+                card.innerHTML = `
+                    <div class="table-header">
+                        <div class="table-number">Table ${table.number}</div>
+                        <div class="capacity-badge">${table.occupied}/${table.capacity}</div>
+                    </div>
+                    ${occupantsHTML}
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        // Update stats
+        function updateStats() {
+            let totalSeated = 0;
+            let tablesOccupied = 0;
+            let seatsAvailable = 0;
+            
+            tables.forEach(table => {
+                totalSeated += table.occupied;
+                if (table.occupied > 0) tablesOccupied++;
+                seatsAvailable += table.available;
+            });
+            
+            document.getElementById('totalSeated').textContent = totalSeated;
+            document.getElementById('tablesOccupied').textContent = tablesOccupied;
+            document.getElementById('seatsAvailable').textContent = seatsAvailable;
+        }
+
+        // Load assignments
+        async function loadAssignments() {
+            try {
+                const response = await fetch('/api/usher/get-all-assignments');
+                const data = await response.json();
+                
+                if (data.success) {
+                    assignments = data.assignments;
+                    renderAssignments();
+                }
+            } catch (error) {
+                console.error('Error loading assignments:', error);
+            }
+        }
+
+        // Render assignments table
+        function renderAssignments() {
+            const tbody = document.getElementById('assignmentsTable');
+            tbody.innerHTML = '';
+            
+            if (assignments.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <div class="empty-icon">📋</div>
+                                <p>No assignments yet</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            assignments.forEach(assignment => {
+                const row = document.createElement('tr');
+                const date = new Date(assignment.assigned_at);
+                const formattedDate = date.toLocaleString();
+                
+                row.innerHTML = `
+                    <td><strong>Table ${assignment.table_number}</strong></td>
+                    <td>#${assignment.ticket_number}</td>
+                    <td>${assignment.full_name}</td>
+                    <td style="color: #666; font-size: 13px;">${formattedDate}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Lookup ticket
+        async function lookupTicket() {
+            const ticketNumber = document.getElementById('ticketSearch').value.trim();
+            const resultDiv = document.getElementById('searchResult');
+            
+            if (!ticketNumber) {
+                resultDiv.innerHTML = '<p style="color: #ef4444;">Please enter a ticket number</p>';
+                resultDiv.classList.add('show');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/usher/lookup-ticket?ticket=${ticketNumber}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (!data.ticket_exists) {
+                        resultDiv.innerHTML = `<p style="color: #ef4444;">❌ Ticket #${ticketNumber} not found in system</p>`;
+                    } else if (data.assignment) {
+                        resultDiv.innerHTML = `
+                            <div class="result-highlight">✅ Table ${data.assignment.table_number}</div>
+                            <p><strong>Guest:</strong> ${data.assignment.full_name}</p>
+                            <p><strong>Ticket:</strong> #${data.assignment.ticket_number}</p>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <p style="color: #f59e0b;">⚠️ Ticket #${ticketNumber} is valid but not yet assigned</p>
+                            <p><strong>Guest:</strong> ${data.guest_name}</p>
+                        `;
+                    }
+                    resultDiv.classList.add('show');
+                } else {
+                    resultDiv.innerHTML = `<p style="color: #ef4444;">Error: ${data.error}</p>`;
+                    resultDiv.classList.add('show');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: #ef4444;">Connection error. Please try again.</p>`;
+                resultDiv.classList.add('show');
+            }
+        }
+
+        // Allow Enter key to search
+        document.getElementById('ticketSearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                lookupTicket();
+            }
+        });
+    </script>
+</body>
+</html>
