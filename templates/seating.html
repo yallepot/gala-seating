@@ -400,6 +400,7 @@
         let assignments = {};
         let selectedTableNumber = null;
         let socket;
+        let tablesLoaded = false;
 
         console.log('Guests:', guests);
 
@@ -407,28 +408,31 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Page loaded, initializing...');
             loadGuests();
-            initializeSocket();
-            loadTables();
+            loadTables(); // Load tables first
+            initializeSocket(); // Then connect socket
         });
 
-        // Socket.IO connection
+        // Socket.IO connection - DELAYED
         function initializeSocket() {
-            console.log('Connecting to WebSocket...');
-            socket = io();
-            
-            socket.on('connect', function() {
-                console.log('Connected to server');
-            });
-            
-            socket.on('table_update', function(data) {
-                console.log('Table update received:', data);
-                tables = data.tables;
-                renderTables();
-            });
+            // Delay socket connection until after initial load
+            setTimeout(() => {
+                console.log('Connecting to WebSocket...');
+                socket = io();
+                
+                socket.on('connect', function() {
+                    console.log('Connected to server');
+                });
+                
+                socket.on('table_update', function(data) {
+                    console.log('Table update received:', data);
+                    tables = data.tables;
+                    renderTables();
+                });
 
-            socket.on('connect_error', function(error) {
-                console.error('Connection error:', error);
-            });
+                socket.on('connect_error', function(error) {
+                    console.error('Connection error:', error);
+                });
+            }, 1000); // Wait 1 second before connecting socket
         }
 
         // Prevent clicking outside modal to close confirmation
@@ -464,9 +468,12 @@
             });
         }
 
-        // Load tables from API
+        // Load tables from API - OPTIMIZED
         async function loadTables() {
             console.log('Loading tables from API...');
+            const grid = document.getElementById('tablesGrid');
+            grid.innerHTML = '<div class="loading">Loading tables...</div>';
+            
             try {
                 const response = await fetch('/api/get-tables');
                 const data = await response.json();
@@ -475,18 +482,19 @@
                 
                 if (data.success) {
                     tables = data.tables;
+                    tablesLoaded = true;
                     renderTables();
                 } else {
                     console.error('Failed to load tables:', data.error);
-                    document.getElementById('tablesGrid').innerHTML = '<div class="loading">Failed to load tables. Please refresh.</div>';
+                    grid.innerHTML = '<div class="loading">Failed to load tables. <a href="#" onclick="loadTables(); return false;">Retry</a></div>';
                 }
             } catch (error) {
                 console.error('Error loading tables:', error);
-                document.getElementById('tablesGrid').innerHTML = '<div class="loading">Error loading tables. Please refresh.</div>';
+                grid.innerHTML = '<div class="loading">Error loading tables. <a href="#" onclick="loadTables(); return false;">Retry</a></div>';
             }
         }
 
-        // Render tables
+        // Render tables - INSTANT
         function renderTables() {
             console.log('Rendering tables...');
             const grid = document.getElementById('tablesGrid');
@@ -496,6 +504,9 @@
                 grid.innerHTML = '<div class="loading">No tables available</div>';
                 return;
             }
+            
+            // Use document fragment for faster rendering
+            const fragment = document.createDocumentFragment();
             
             tables.forEach(table => {
                 const card = document.createElement('div');
@@ -535,9 +546,10 @@
                     card.onclick = () => openTableModal(table.number);
                 }
                 
-                grid.appendChild(card);
+                fragment.appendChild(card);
             });
             
+            grid.appendChild(fragment);
             console.log(`Rendered ${tables.length} tables`);
         }
 
@@ -578,7 +590,7 @@
             selectedTableNumber = null;
         }
 
-        // Confirm table selection
+        // Confirm table selection - OPTIMISTIC UPDATE
         function confirmTableSelection() {
             const checkboxes = document.querySelectorAll('#ticketSelector input[type="checkbox"]:checked');
             
@@ -587,16 +599,44 @@
                 return;
             }
             
+            // Optimistic update - update UI immediately
             checkboxes.forEach(cb => {
                 assignments[cb.value] = selectedTableNumber;
             });
             
             closeModal();
             loadGuests();
-            loadTables();
+            
+            // Update tables optimistically
+            renderTablesOptimistically();
             
             // Check if all assigned and auto-show confirmation
             checkAndShowConfirmation();
+        }
+
+        // Optimistic table rendering
+        function renderTablesOptimistically() {
+            // Update table occupancy locally without waiting for server
+            tables.forEach(table => {
+                if (table.number === selectedTableNumber) {
+                    // Add to occupants list locally
+                    guests.forEach(guest => {
+                        if (assignments[guest.ticket_number] === selectedTableNumber) {
+                            const alreadyInTable = table.occupants.some(occ => occ.ticket === guest.ticket_number);
+                            if (!alreadyInTable) {
+                                table.occupants.push({
+                                    name: guest.full_name,
+                                    ticket: guest.ticket_number
+                                });
+                                table.occupied = table.occupants.length;
+                                table.available = table.capacity - table.occupied;
+                                table.is_full = table.occupied >= table.capacity;
+                            }
+                        }
+                    });
+                }
+            });
+            renderTables();
         }
 
         // Check if all assigned and show confirmation
@@ -605,7 +645,7 @@
             if (allAssigned) {
                 setTimeout(() => {
                     showConfirmationModal();
-                }, 500);
+                }, 300); // Faster popup
             }
         }
 
@@ -644,6 +684,12 @@
                 table_number: assignments[guest.ticket_number]
             }));
             
+            // Show loading state
+            const confirmBtn = document.querySelector('#confirmationModal .btn-primary');
+            const originalText = confirmBtn.textContent;
+            confirmBtn.textContent = 'Saving...';
+            confirmBtn.disabled = true;
+            
             try {
                 const response = await fetch('/api/assign-seats', {
                     method: 'POST',
@@ -659,11 +705,13 @@
                     window.location.href = '/confirmation';
                 } else {
                     alert('Error: ' + data.error);
-                    closeConfirmationModal();
+                    confirmBtn.textContent = originalText;
+                    confirmBtn.disabled = false;
                 }
             } catch (error) {
                 alert('Connection error. Please try again.');
-                closeConfirmationModal();
+                confirmBtn.textContent = originalText;
+                confirmBtn.disabled = false;
             }
         }
     </script>
