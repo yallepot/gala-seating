@@ -470,7 +470,8 @@ def reset_tickets():
         db.session.bulk_save_objects(new_tickets)
         db.session.commit()
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        # Broadcast update - use namespace parameter instead of broadcast
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({
             'success': True, 
