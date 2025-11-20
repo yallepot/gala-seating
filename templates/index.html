@@ -94,7 +94,8 @@
             margin-bottom: 6px;
         }
 
-        input[type="text"] {
+        input[type="text"],
+        input[type="number"] {
             width: 100%;
             padding: 12px;
             border: 1px solid #d1d5db;
@@ -103,7 +104,8 @@
             transition: all 0.3s;
         }
 
-        input[type="text"]:focus {
+        input[type="text"]:focus,
+        input[type="number"]:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -291,7 +293,7 @@
                 </div>
                 <div class="form-group">
                     <label for="ticket-${guestCount}">Ticket Number</label>
-                    <input type="text" id="ticket-${guestCount}" name="ticket_number" required placeholder="e.g., GALA-0001" style="text-transform: uppercase;">
+                    <input type="number" id="ticket-${guestCount}" name="ticket_number" required placeholder="e.g., 123" min="1" max="250">
                 </div>
             `;
             
@@ -329,7 +331,7 @@
             
             for (let entry of entries) {
                 const fullName = entry.querySelector('input[name="full_name"]').value.trim();
-                const ticketNumber = entry.querySelector('input[name="ticket_number"]').value.trim().toUpperCase();
+                const ticketNumber = entry.querySelector('input[name="ticket_number"]').value.trim();
                 
                 if (!fullName || !ticketNumber) {
                     showError('Please fill out all fields');
