@@ -235,7 +235,6 @@
             background: #e5e7eb;
         }
 
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -305,7 +304,6 @@
             margin-top: 20px;
         }
 
-        /* Confirmation Modal */
         .confirmation-list {
             margin: 20px 0;
         }
@@ -334,6 +332,13 @@
             font-weight: 600;
         }
 
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 18px;
+        }
+
         @media (max-width: 768px) {
             .tables-grid {
                 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -360,7 +365,7 @@
         </div>
 
         <div class="tables-grid" id="tablesGrid">
-            <!-- Tables will be loaded here -->
+            <div class="loading">Loading tables...</div>
         </div>
 
         <div class="actions">
@@ -415,15 +420,19 @@
         let selectedTableNumber = null;
         let socket;
 
+        console.log('Guests:', guests);
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            initializeSocket();
+            console.log('Page loaded, initializing...');
             loadGuests();
+            initializeSocket();
             loadTables();
         });
 
         // Socket.IO connection
         function initializeSocket() {
+            console.log('Connecting to WebSocket...');
             socket = io();
             
             socket.on('connect', function() {
@@ -431,13 +440,19 @@
             });
             
             socket.on('table_update', function(data) {
+                console.log('Table update received:', data);
                 tables = data.tables;
                 renderTables();
+            });
+
+            socket.on('connect_error', function(error) {
+                console.error('Connection error:', error);
             });
         }
 
         // Load guests
         function loadGuests() {
+            console.log('Loading guests...');
             const guestsContainer = document.getElementById('guestsList');
             guestsContainer.innerHTML = '';
             
@@ -465,23 +480,36 @@
 
         // Load tables from API
         async function loadTables() {
+            console.log('Loading tables from API...');
             try {
                 const response = await fetch('/api/get-tables');
                 const data = await response.json();
                 
+                console.log('Tables loaded:', data);
+                
                 if (data.success) {
                     tables = data.tables;
                     renderTables();
+                } else {
+                    console.error('Failed to load tables:', data.error);
+                    document.getElementById('tablesGrid').innerHTML = '<div class="loading">Failed to load tables. Please refresh.</div>';
                 }
             } catch (error) {
                 console.error('Error loading tables:', error);
+                document.getElementById('tablesGrid').innerHTML = '<div class="loading">Error loading tables. Please refresh.</div>';
             }
         }
 
         // Render tables
         function renderTables() {
+            console.log('Rendering tables...');
             const grid = document.getElementById('tablesGrid');
             grid.innerHTML = '';
+            
+            if (!tables || tables.length === 0) {
+                grid.innerHTML = '<div class="loading">No tables available</div>';
+                return;
+            }
             
             tables.forEach(table => {
                 const card = document.createElement('div');
@@ -493,13 +521,8 @@
                     card.classList.add('blocked');
                 }
                 
-                // Check if any of user's tickets are at this table
-                const userAtTable = table.occupants.some(occ => 
-                    guests.some(g => g.ticket_number === occ.ticket)
-                );
-                
                 let occupantsHTML = '';
-                if (table.occupants.length > 0) {
+                if (table.occupants && table.occupants.length > 0) {
                     occupantsHTML = '<div class="occupants-list">';
                     table.occupants.forEach(occ => {
                         occupantsHTML += `
@@ -521,7 +544,6 @@
                     ${occupantsHTML}
                 `;
                 
-                // Add click handler if table is available
                 if (!table.is_full && !table.is_blocked) {
                     card.style.cursor = 'pointer';
                     card.onclick = () => openTableModal(table.number);
@@ -529,6 +551,8 @@
                 
                 grid.appendChild(card);
             });
+            
+            console.log(`Rendered ${tables.length} tables`);
         }
 
         // Open table selection modal
@@ -536,7 +560,6 @@
             selectedTableNumber = tableNumber;
             document.getElementById('modalTitle').textContent = `Assign to Table ${tableNumber}`;
             
-            // Get unassigned guests
             const unassignedGuests = guests.filter(g => !assignments[g.ticket_number]);
             
             if (unassignedGuests.length === 0) {
@@ -544,7 +567,6 @@
                 return;
             }
             
-            // Render ticket checkboxes
             const selector = document.getElementById('ticketSelector');
             selector.innerHTML = '';
             
@@ -579,7 +601,6 @@
                 return;
             }
             
-            // Add to assignments
             checkboxes.forEach(cb => {
                 assignments[cb.value] = selectedTableNumber;
             });
