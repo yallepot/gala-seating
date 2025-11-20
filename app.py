@@ -3,10 +3,11 @@ Gala Seating System - Main Application
 Real-time seating assignment with WebSocket support
 """
 
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from functools import wraps
 import os
 import secrets
 
@@ -15,6 +16,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///gala_seating.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin123')  # CHANGE THIS!
 
 # Fix for Heroku postgres URL
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
@@ -92,7 +94,7 @@ def init_database():
             # Create 250 sample tickets (25 tables × 10 seats)
             for i in range(1, 251):
                 ticket = Ticket(
-                    ticket_number=f'GALA-{i:04d}',
+                    ticket_number=str(i),  # Just the number
                     full_name=f'Guest {i}'
                 )
                 sample_tickets.append(ticket)
@@ -100,6 +102,23 @@ def init_database():
             db.session.bulk_save_objects(sample_tickets)
             db.session.commit()
             print(f"Created {len(sample_tickets)} sample tickets")
+
+
+# ==================== ADMIN AUTHENTICATION ====================
+
+def check_admin_auth():
+    """Check if user is authenticated as admin"""
+    return session.get('admin_authenticated', False)
+
+
+def require_admin(f):
+    """Decorator to require admin authentication"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not check_admin_auth():
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -156,7 +175,7 @@ def validate_tickets(ticket_data):
     validated_guests = []
     
     for data in ticket_data:
-        ticket_number = data.get('ticket_number', '').strip().upper()
+        ticket_number = data.get('ticket_number', '').strip()
         full_name = data.get('full_name', '').strip()
         
         if not ticket_number or not full_name:
@@ -271,10 +290,32 @@ def confirmation():
 
 @app.route('/admin')
 def admin_panel():
-    """Admin panel for managing tables and assignments"""
+    """Admin panel - requires authentication"""
+    if not check_admin_auth():
+        return render_template('admin_login.html')
+    
     return render_template('admin.html',
         total_tables=TOTAL_TABLES,
         seats_per_table=SEATS_PER_TABLE)
+
+
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    """Admin login endpoint"""
+    password = request.form.get('password', '')
+    
+    if password == app.config['ADMIN_PASSWORD']:
+        session['admin_authenticated'] = True
+        return redirect(url_for('admin_panel'))
+    else:
+        return render_template('admin_login.html', error="Invalid password")
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    """Admin logout"""
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('index'))
 
 
 # ==================== API ENDPOINTS ====================
@@ -346,7 +387,7 @@ def assign_seats_api():
             if existing:
                 return jsonify({
                     'success': False, 
-                    'error': f"Ticket {assignment['ticket_number']} is already assigned. Please delete the existing assignment first."
+                    'error': f"Ticket {assignment['ticket_number']} is already assigned"
                 }), 400
         
         # Perform atomic assignment
@@ -378,16 +419,6 @@ def delete_assignment_api():
         
         if not ticket_number:
             return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
-        
-        # Verify session has validated guests
-        validated_guests = session.get('validated_guests', [])
-        if not validated_guests:
-            return jsonify({'success': False, 'error': 'Session expired. Please start over.'}), 401
-        
-        # Verify this ticket belongs to the current session
-        valid_tickets = {g['ticket_number'] for g in validated_guests}
-        if ticket_number not in valid_tickets:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
         # Find and delete the assignment
         assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
@@ -438,9 +469,10 @@ def handle_update_request():
     emit('table_update', {'tables': get_table_status()})
 
 
-# ==================== ADMIN ROUTES (Optional) ====================
+# ==================== ADMIN ROUTES ====================
 
 @app.route('/admin/reset-demo')
+@require_admin
 def reset_demo():
     """Reset all assignments for demo purposes"""
     try:
@@ -465,6 +497,7 @@ def reset_demo():
 
 
 @app.route('/api/admin/block-table', methods=['POST'])
+@require_admin
 def block_table_api():
     """Block a table from being selected"""
     try:
@@ -498,6 +531,7 @@ def block_table_api():
 
 
 @app.route('/api/admin/unblock-table', methods=['POST'])
+@require_admin
 def unblock_table_api():
     """Unblock a table"""
     try:
@@ -526,6 +560,7 @@ def unblock_table_api():
 
 
 @app.route('/api/admin/get-all-assignments', methods=['GET'])
+@require_admin
 def get_all_assignments_api():
     """Get all seat assignments for admin view"""
     try:
@@ -551,6 +586,7 @@ def get_all_assignments_api():
 
 
 @app.route('/api/admin/delete-any-assignment', methods=['POST'])
+@require_admin
 def admin_delete_assignment():
     """Admin can delete any assignment"""
     try:
@@ -589,6 +625,7 @@ def admin_delete_assignment():
 
 
 @app.route('/api/admin/lookup-ticket', methods=['GET'])
+@require_admin
 def lookup_ticket_api():
     """Look up a ticket to find table assignment"""
     try:
@@ -597,7 +634,7 @@ def lookup_ticket_api():
         if not ticket_number:
             return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
         
-        ticket_number = ticket_number.strip().upper()
+        ticket_number = ticket_number.strip()
         
         # Check if ticket exists
         ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
@@ -639,9 +676,8 @@ def lookup_ticket_api():
 # ==================== APPLICATION STARTUP ====================
 # Initialize database
 init_database()
-if __name__ == '__main__':
 
-    
+if __name__ == '__main__':
     # Get port from environment (for Render/Heroku)
     port = int(os.environ.get('PORT', 5000))
     
