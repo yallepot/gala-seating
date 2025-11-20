@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///gala_seating.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin123')  # CHANGE THIS!
+app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
 # Fix for Heroku postgres URL
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
@@ -56,7 +56,6 @@ class TableAssignment(db.Model):
     table_number = db.Column(db.Integer, nullable=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Composite index for fast table lookups
     __table_args__ = (
         db.Index('idx_table_lookup', 'table_number', 'assigned_at'),
     )
@@ -83,18 +82,15 @@ class BlockedTable(db.Model):
 def init_database():
     """Initialize database and create sample tickets"""
     with app.app_context():
-        # Create all tables
         db.create_all()
         
-        # Check if we need to add sample tickets
         if Ticket.query.count() == 0:
             print("Creating sample tickets...")
             sample_tickets = []
             
-            # Create 250 sample tickets (25 tables × 10 seats)
             for i in range(1, 251):
                 ticket = Ticket(
-                    ticket_number=str(i),  # Just the number
+                    ticket_number=str(i),
                     full_name=f'Guest {i}'
                 )
                 sample_tickets.append(ticket)
@@ -127,15 +123,12 @@ def get_table_status():
     """Get current status of all tables with real-time occupancy data"""
     tables = []
     
-    # Get all blocked tables
     blocked_tables = {bt.table_number: bt.reason for bt in BlockedTable.query.all()}
     
     for table_num in range(1, TOTAL_TABLES + 1):
-        # Check if table is blocked
         is_blocked = table_num in blocked_tables
         block_reason = blocked_tables.get(table_num, None)
         
-        # Get all assignments for this table
         assignments = TableAssignment.query.filter_by(
             table_number=table_num
         ).order_by(TableAssignment.assigned_at).all()
@@ -163,15 +156,7 @@ def get_table_status():
 
 
 def validate_tickets(ticket_data):
-    """
-    Validate ticket numbers and check availability
-    
-    Args:
-        ticket_data: List of dicts with 'full_name' and 'ticket_number'
-    
-    Returns:
-        tuple: (is_valid, validated_guests, error_message)
-    """
+    """Validate ticket numbers and check availability"""
     validated_guests = []
     
     for data in ticket_data:
@@ -181,7 +166,6 @@ def validate_tickets(ticket_data):
         if not ticket_number or not full_name:
             return False, [], "All fields must be filled out"
         
-        # Check if ticket exists
         ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
         
         if not ticket:
@@ -200,30 +184,19 @@ def validate_tickets(ticket_data):
 
 
 def assign_seats_atomic(assignments):
-    """
-    Atomically assign seats to tables
-    
-    Args:
-        assignments: List of dicts with 'ticket_number', 'full_name', 'table_number'
-    
-    Returns:
-        tuple: (success, error_message)
-    """
+    """Atomically assign seats to tables"""
     try:
-        # Start transaction
         for assignment_data in assignments:
             table_number = assignment_data['table_number']
             ticket_number = assignment_data['ticket_number']
             full_name = assignment_data['full_name']
             
-            # Check if table is blocked
             blocked = BlockedTable.query.filter_by(table_number=table_number).first()
             if blocked:
                 db.session.rollback()
                 reason = blocked.reason or "reserved"
                 return False, f"Table {table_number} is blocked ({reason})"
             
-            # Check table capacity
             current_count = TableAssignment.query.filter_by(
                 table_number=table_number
             ).count()
@@ -232,7 +205,6 @@ def assign_seats_atomic(assignments):
                 db.session.rollback()
                 return False, f"Table {table_number} is full ({current_count}/{SEATS_PER_TABLE})"
             
-            # Create assignment
             new_assignment = TableAssignment(
                 ticket_number=ticket_number,
                 full_name=full_name,
@@ -240,12 +212,10 @@ def assign_seats_atomic(assignments):
             )
             db.session.add(new_assignment)
             
-            # Mark ticket as used
             ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
             ticket.is_used = True
             ticket.used_at = datetime.utcnow()
         
-        # Commit all changes atomically
         db.session.commit()
         return True, None
         
@@ -265,7 +235,6 @@ def index():
 @app.route('/seating')
 def seating():
     """Interactive seating view page"""
-    # Check if user has validated guests in session
     if 'validated_guests' not in session:
         return render_template('error.html', 
             error="Please register your tickets first",
@@ -334,7 +303,6 @@ def validate_tickets_api():
         if not is_valid:
             return jsonify({'success': False, 'error': error}), 400
         
-        # Store validated guests in session
         session['validated_guests'] = validated_guests
         
         return jsonify({
@@ -366,19 +334,16 @@ def assign_seats_api():
         if not assignments:
             return jsonify({'success': False, 'error': 'No assignments provided'}), 400
         
-        # Verify session has validated guests
         validated_guests = session.get('validated_guests', [])
         if not validated_guests:
             return jsonify({'success': False, 'error': 'Session expired. Please start over.'}), 401
         
-        # Verify all assignments match validated guests
         valid_tickets = {g['ticket_number'] for g in validated_guests}
         assignment_tickets = {a['ticket_number'] for a in assignments}
         
         if not assignment_tickets.issubset(valid_tickets):
             return jsonify({'success': False, 'error': 'Invalid assignment data'}), 400
         
-        # Check for existing assignments
         for assignment in assignments:
             existing = TableAssignment.query.filter_by(
                 ticket_number=assignment['ticket_number']
@@ -390,16 +355,13 @@ def assign_seats_api():
                     'error': f"Ticket {assignment['ticket_number']} is already assigned"
                 }), 400
         
-        # Perform atomic assignment
         success, error = assign_seats_atomic(assignments)
         
         if not success:
             return jsonify({'success': False, 'error': error}), 400
         
-        # Store assignments in session for confirmation page
         session['assignments'] = assignments
         
-        # Broadcast update to all connected clients via WebSocket
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
         return jsonify({
@@ -420,16 +382,13 @@ def delete_assignment_api():
         if not ticket_number:
             return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
         
-        # Find and delete the assignment
         assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
         
         if not assignment:
             return jsonify({'success': False, 'error': 'Assignment not found'}), 404
         
-        # Delete the assignment
         db.session.delete(assignment)
         
-        # Mark ticket as available again
         ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
         if ticket:
             ticket.is_used = False
@@ -437,7 +396,6 @@ def delete_assignment_api():
         
         db.session.commit()
         
-        # Broadcast update to all connected clients
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
         return jsonify({'success': True, 'message': 'Assignment deleted successfully'})
@@ -453,7 +411,6 @@ def delete_assignment_api():
 def handle_connect():
     """Handle client connection"""
     print('Client connected')
-    # Send current table status to newly connected client
     emit('table_update', {'tables': get_table_status()})
 
 
@@ -471,21 +428,37 @@ def handle_update_request():
 
 # ==================== ADMIN ROUTES ====================
 
+@app.route('/admin/reset-demo')
+@require_admin
+def reset_demo():
+    """Reset all assignments for demo purposes"""
+    try:
+        TableAssignment.query.delete()
+        
+        Ticket.query.update({
+            'is_used': False,
+            'used_at': None
+        })
+        
+        db.session.commit()
+        
+        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        
+        return jsonify({'success': True, 'message': 'Demo reset successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/admin/reset-tickets')
 @require_admin
 def reset_tickets():
     """Reset all tickets with new numbering (1-250)"""
     try:
-        # Delete all assignments
         TableAssignment.query.delete()
-        
-        # Delete all old tickets
         Ticket.query.delete()
-        
-        # Commit deletion first
         db.session.commit()
         
-        # Create new tickets (1-250)
         new_tickets = []
         for i in range(1, 251):
             ticket = Ticket(
@@ -497,7 +470,6 @@ def reset_tickets():
         db.session.bulk_save_objects(new_tickets)
         db.session.commit()
         
-        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
         return jsonify({
@@ -508,6 +480,7 @@ def reset_tickets():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/admin/block-table', methods=['POST'])
 @require_admin
@@ -520,12 +493,10 @@ def block_table_api():
         if not table_number or table_number < 1 or table_number > TOTAL_TABLES:
             return jsonify({'success': False, 'error': 'Invalid table number'}), 400
         
-        # Check if already blocked
         existing = BlockedTable.query.filter_by(table_number=table_number).first()
         if existing:
             return jsonify({'success': False, 'error': 'Table already blocked'}), 400
         
-        # Create block
         blocked = BlockedTable(
             table_number=table_number,
             reason=reason
@@ -533,7 +504,6 @@ def block_table_api():
         db.session.add(blocked)
         db.session.commit()
         
-        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
         return jsonify({'success': True, 'message': f'Table {table_number} blocked'})
@@ -553,7 +523,6 @@ def unblock_table_api():
         if not table_number:
             return jsonify({'success': False, 'error': 'No table number provided'}), 400
         
-        # Find and delete the block
         blocked = BlockedTable.query.filter_by(table_number=table_number).first()
         
         if not blocked:
@@ -562,7 +531,6 @@ def unblock_table_api():
         db.session.delete(blocked)
         db.session.commit()
         
-        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
         return jsonify({'success': True, 'message': f'Table {table_number} unblocked'})
@@ -608,7 +576,6 @@ def admin_delete_assignment():
         if not assignment_id:
             return jsonify({'success': False, 'error': 'No assignment ID provided'}), 400
         
-        # Find the assignment
         assignment = TableAssignment.query.get(assignment_id)
         
         if not assignment:
@@ -616,10 +583,8 @@ def admin_delete_assignment():
         
         ticket_number = assignment.ticket_number
         
-        # Delete the assignment
         db.session.delete(assignment)
         
-        # Mark ticket as available again
         ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
         if ticket:
             ticket.is_used = False
@@ -627,7 +592,6 @@ def admin_delete_assignment():
         
         db.session.commit()
         
-        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
         return jsonify({'success': True, 'message': 'Assignment deleted'})
@@ -649,7 +613,6 @@ def lookup_ticket_api():
         
         ticket_number = ticket_number.strip()
         
-        # Check if ticket exists
         ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
         
         if not ticket:
@@ -659,7 +622,6 @@ def lookup_ticket_api():
                 'assignment': None
             })
         
-        # Check if ticket has an assignment
         assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
         
         if assignment:
@@ -687,12 +649,8 @@ def lookup_ticket_api():
 
 
 # ==================== APPLICATION STARTUP ====================
-# Initialize database
 init_database()
 
 if __name__ == '__main__':
-    # Get port from environment (for Render/Heroku)
     port = int(os.environ.get('PORT', 5000))
-    
-    # Run with SocketIO
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
