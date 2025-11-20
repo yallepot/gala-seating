@@ -120,25 +120,35 @@ def require_admin(f):
 # ==================== HELPER FUNCTIONS ====================
 
 def get_table_status():
-    """Get current status of all tables with real-time occupancy data"""
+    """Get current status of all tables with real-time occupancy data - OPTIMIZED"""
+    # Single query to get all blocked tables
+    blocked_tables_query = BlockedTable.query.all()
+    blocked_tables = {bt.table_number: bt.reason for bt in blocked_tables_query}
+    
+    # Single query to get all assignments with eager loading
+    all_assignments = TableAssignment.query.order_by(TableAssignment.table_number, TableAssignment.assigned_at).all()
+    
+    # Group assignments by table number
+    assignments_by_table = {}
+    for assignment in all_assignments:
+        if assignment.table_number not in assignments_by_table:
+            assignments_by_table[assignment.table_number] = []
+        assignments_by_table[assignment.table_number].append(assignment)
+    
+    # Build table data
     tables = []
-    
-    blocked_tables = {bt.table_number: bt.reason for bt in BlockedTable.query.all()}
-    
     for table_num in range(1, TOTAL_TABLES + 1):
         is_blocked = table_num in blocked_tables
         block_reason = blocked_tables.get(table_num, None)
         
-        assignments = TableAssignment.query.filter_by(
-            table_number=table_num
-        ).order_by(TableAssignment.assigned_at).all()
+        table_assignments = assignments_by_table.get(table_num, [])
         
         occupants = [
             {
                 'name': assignment.full_name,
                 'ticket': assignment.ticket_number
             }
-            for assignment in assignments
+            for assignment in table_assignments
         ]
         
         tables.append({
@@ -153,7 +163,6 @@ def get_table_status():
         })
     
     return tables
-
 
 def validate_tickets(ticket_data):
     """Validate ticket numbers and check availability"""
