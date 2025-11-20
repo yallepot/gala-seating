@@ -471,30 +471,43 @@ def handle_update_request():
 
 # ==================== ADMIN ROUTES ====================
 
-@app.route('/admin/reset-demo')
+@app.route('/admin/reset-tickets')
 @require_admin
-def reset_demo():
-    """Reset all assignments for demo purposes"""
+def reset_tickets():
+    """Reset all tickets with new numbering (1-250)"""
     try:
         # Delete all assignments
         TableAssignment.query.delete()
         
-        # Reset all tickets
-        Ticket.query.update({
-            'is_used': False,
-            'used_at': None
-        })
+        # Delete all old tickets
+        Ticket.query.delete()
         
+        # Commit deletion first
+        db.session.commit()
+        
+        # Create new tickets (1-250)
+        new_tickets = []
+        for i in range(1, 251):
+            ticket = Ticket(
+                ticket_number=str(i),
+                full_name=f'Guest {i}'
+            )
+            new_tickets.append(ticket)
+        
+        db.session.bulk_save_objects(new_tickets)
         db.session.commit()
         
         # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
         
-        return jsonify({'success': True, 'message': 'Demo reset successfully'})
+        return jsonify({
+            'success': True, 
+            'message': 'Created 250 tickets numbered 1-250'
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
-
 
 @app.route('/api/admin/block-table', methods=['POST'])
 @require_admin
