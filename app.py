@@ -1,7 +1,7 @@
 """
 Gala Seating System - Main Application
 Real-time seating assignment with WebSocket support
-FULLY DEBUGGED VERSION - All bugs fixed
+FULLY DEBUGGED VERSION 1.0 - All bugs fixed
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
