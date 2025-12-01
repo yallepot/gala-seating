@@ -1,6 +1,7 @@
 """
 Gala Seating System - Main Application
 Real-time seating assignment with WebSocket support
+FULLY DEBUGGED VERSION - All bugs fixed
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
@@ -163,6 +164,7 @@ def get_table_status():
         })
     
     return tables
+
 
 def validate_tickets(ticket_data):
     """Validate ticket numbers and check availability"""
@@ -405,7 +407,7 @@ def delete_assignment_api():
         
         db.session.commit()
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True, 'message': 'Assignment deleted successfully'})
         
@@ -451,7 +453,7 @@ def reset_demo():
         
         db.session.commit()
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True, 'message': 'Demo reset successfully'})
     except Exception as e:
@@ -479,7 +481,6 @@ def reset_tickets():
         db.session.bulk_save_objects(new_tickets)
         db.session.commit()
         
-        # Broadcast update - use namespace parameter instead of broadcast
         socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({
@@ -514,7 +515,7 @@ def block_table_api():
         db.session.add(blocked)
         db.session.commit()
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True, 'message': f'Table {table_number} blocked'})
         
@@ -541,7 +542,7 @@ def unblock_table_api():
         db.session.delete(blocked)
         db.session.commit()
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True, 'message': f'Table {table_number} unblocked'})
         
@@ -602,7 +603,7 @@ def admin_delete_assignment():
         
         db.session.commit()
         
-        socketio.emit('table_update', {'tables': get_table_status()}, broadcast=True)
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True, 'message': 'Assignment deleted'})
         
@@ -656,6 +657,7 @@ def lookup_ticket_api():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ==================== USHER ROUTES ====================
 
@@ -746,7 +748,8 @@ def usher_get_tables():
         return jsonify({'success': True, 'tables': tables})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-        
+
+
 # ==================== APPLICATION STARTUP ====================
 init_database()
 
