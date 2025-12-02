@@ -370,7 +370,7 @@
             </div>
 
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeConfirmationModal()">Make Changes</button>
+                <button class="btn btn-secondary" onclick="makeChanges()">Make Changes</button>
                 <button class="btn btn-primary" id="finalConfirmBtn" onclick="finalizeAssignments()">Confirm & Continue</button>
             </div>
         </div>
@@ -595,12 +595,29 @@
             document.getElementById('confirmationModal').classList.add('show');
         }
 
-        // Close confirmation modal
-        function closeConfirmationModal() {
+        // FIXED: Make Changes - Allow reassignment
+        function makeChanges() {
+            // Close confirmation modal
             document.getElementById('confirmationModal').classList.remove('show');
+            
+            // Clear all assignments
+            assignments = {};
+            
+            // Refresh guest badges
+            loadGuests();
+            
+            // Refresh tables
+            loadTables();
+            
+            // User can now click on tables again to reassign
         }
 
-        // FIXED: Finalize assignments
+        // Close confirmation modal (deprecated - use makeChanges instead)
+        function closeConfirmationModal() {
+            makeChanges();
+        }
+
+        // Finalize assignments
         async function finalizeAssignments() {
             console.log('=== FINALIZING ASSIGNMENTS ===');
             console.log('Assignments:', assignments);
