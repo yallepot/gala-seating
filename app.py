@@ -167,8 +167,9 @@ def get_table_status():
 
 
 def validate_tickets(ticket_data):
-    """Validate ticket numbers and check availability"""
+    """Validate ticket numbers and check availability - INCLUDES DUPLICATE CHECK"""
     validated_guests = []
+    ticket_numbers_in_request = []
     
     for data in ticket_data:
         ticket_number = data.get('ticket_number', '').strip()
@@ -177,13 +178,25 @@ def validate_tickets(ticket_data):
         if not ticket_number or not full_name:
             return False, [], "All fields must be filled out"
         
+        # Check for duplicates in current request
+        if ticket_number in ticket_numbers_in_request:
+            return False, [], f"Ticket {ticket_number} appears multiple times in your entry. Please remove duplicates."
+        
+        ticket_numbers_in_request.append(ticket_number)
+        
+        # Check if ticket exists in database
         ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
         
         if not ticket:
-            return False, [], f"Invalid ticket number: {ticket_number}"
+            return False, [], f"Ticket {ticket_number} is invalid or does not exist"
         
+        # Check if ticket is already used/assigned
         if ticket.is_used:
-            return False, [], f"Ticket {ticket_number} has already been used"
+            assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
+            if assignment:
+                return False, [], f"Ticket {ticket_number} has already been assigned to Table {assignment.table_number}"
+            else:
+                return False, [], f"Ticket {ticket_number} has already been used"
         
         validated_guests.append({
             'ticket_number': ticket_number,
@@ -192,7 +205,6 @@ def validate_tickets(ticket_data):
         })
     
     return True, validated_guests, None
-
 
 def assign_seats_atomic(assignments):
     """Atomically assign seats to tables"""
@@ -752,6 +764,80 @@ def usher_get_tables():
 
 # ==================== APPLICATION STARTUP ====================
 init_database()
+
+@app.route('/api/admin/edit-assignment', methods=['POST'])
+@require_admin
+def edit_assignment_api():
+    """Edit an existing assignment - change ticket number, name, or table"""
+    try:
+        assignment_id = request.json.get('assignment_id')
+        new_ticket_number = request.json.get('ticket_number', '').strip()
+        new_full_name = request.json.get('full_name', '').strip()
+        new_table_number = request.json.get('table_number')
+        
+        if not assignment_id:
+            return jsonify({'success': False, 'error': 'Assignment ID required'}), 400
+        
+        # Get existing assignment
+        assignment = TableAssignment.query.get(assignment_id)
+        if not assignment:
+            return jsonify({'success': False, 'error': 'Assignment not found'}), 404
+        
+        old_ticket_number = assignment.ticket_number
+        old_table_number = assignment.table_number
+        
+        # If changing ticket number, check if new ticket is available
+        if new_ticket_number and new_ticket_number != old_ticket_number:
+            existing = TableAssignment.query.filter_by(ticket_number=new_ticket_number).first()
+            if existing:
+                return jsonify({
+                    'success': False,
+                    'error': f'Ticket {new_ticket_number} is already assigned to Table {existing.table_number}'
+                }), 400
+            
+            # Free up old ticket
+            old_ticket = Ticket.query.filter_by(ticket_number=old_ticket_number).first()
+            if old_ticket:
+                old_ticket.is_used = False
+                old_ticket.used_at = None
+            
+            # Mark new ticket as used
+            new_ticket = Ticket.query.filter_by(ticket_number=new_ticket_number).first()
+            if new_ticket:
+                new_ticket.is_used = True
+                new_ticket.used_at = datetime.utcnow()
+            
+            assignment.ticket_number = new_ticket_number
+        
+        # Update name if provided
+        if new_full_name:
+            assignment.full_name = new_full_name
+        
+        # If changing table, check capacity
+        if new_table_number and new_table_number != old_table_number:
+            # Check new table capacity
+            new_table_count = TableAssignment.query.filter_by(table_number=new_table_number).count()
+            if new_table_count >= SEATS_PER_TABLE:
+                return jsonify({
+                    'success': False,
+                    'error': f'Table {new_table_number} is full ({new_table_count}/{SEATS_PER_TABLE})'
+                }), 400
+            
+            assignment.table_number = new_table_number
+        
+        db.session.commit()
+        
+        # Broadcast update
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Assignment updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
