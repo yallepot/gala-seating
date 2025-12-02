@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Gala Seating</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -13,221 +14,56 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f3f4f6;
             min-height: 100vh;
             padding: 20px;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
         .header {
-            background: white;
-            border-radius: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
         h1 {
-            color: #333;
             font-size: 28px;
             margin-bottom: 10px;
         }
 
-        .subtitle {
-            color: #666;
+        .header p {
+            opacity: 0.9;
             font-size: 14px;
         }
 
-        .admin-badge {
-            display: inline-block;
-            background: #ef4444;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .stat-card {
-            background: #f9fafb;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #333;
-        }
-
-        .stat-label {
-            color: #666;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-
-        .main-content {
+        .controls {
             background: white;
-            border-radius: 16px;
-            padding: 30px;
+            padding: 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        .section {
-            margin-bottom: 40px;
-        }
-
-        .section:last-child {
-            margin-bottom: 0;
-        }
-
-        .section-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e5e7eb;
-        }
-
-        .tables-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 15px;
-        }
-
-        .table-card {
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .table-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-        }
-
-        .table-card.blocked {
-            background: #fee2e2;
-            border-color: #ef4444;
-        }
-
-        .table-card.full {
-            background: #fef3c7;
-            border-color: #f59e0b;
-        }
-
-        .table-card.available {
-            background: #dcfce7;
-            border-color: #10b981;
-        }
-
-        .table-number {
+        .controls h2 {
             font-size: 18px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .table-status {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .block-btn, .unblock-btn {
-            margin-top: 10px;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            transition: all 0.3s;
-        }
-
-        .block-btn {
-            background: #ef4444;
-            color: white;
-        }
-
-        .block-btn:hover {
-            background: #dc2626;
-        }
-
-        .unblock-btn {
-            background: #10b981;
-            color: white;
-        }
-
-        .unblock-btn:hover {
-            background: #059669;
-        }
-
-        .assignments-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        .assignments-table th {
-            background: #f9fafb;
-            padding: 12px;
-            text-align: left;
-            font-size: 13px;
-            font-weight: 600;
-            color: #555;
-            border-bottom: 2px solid #e5e7eb;
-        }
-
-        .assignments-table td {
-            padding: 12px;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 14px;
+            margin-bottom: 15px;
             color: #333;
         }
 
-        .assignments-table tr:hover {
-            background: #f9fafb;
-        }
-
-        .delete-btn-small {
-            background: #ef4444;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-
-        .delete-btn-small:hover {
-            background: #dc2626;
-        }
-
-        .action-buttons {
+        .button-group {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
 
-        .action-btn {
+        .btn {
             padding: 12px 24px;
             border: none;
             border-radius: 8px;
@@ -237,15 +73,6 @@
             transition: all 0.3s;
         }
 
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
         .btn-primary {
             background: #667eea;
             color: white;
@@ -253,6 +80,178 @@
 
         .btn-primary:hover {
             background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .section {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .table-btn {
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .table-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .table-btn.blocked {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+
+        .table-btn.full {
+            background: #f3f4f6;
+            color: #9ca3af;
+        }
+
+        .assignments-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .assignments-table th {
+            background: #f9fafb;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .assignments-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .assignments-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .delete-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .lookup-result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .lookup-result.not-found {
+            background: #fee2e2;
+            border-left-color: #ef4444;
         }
 
         .modal {
@@ -278,143 +277,142 @@
             padding: 30px;
             max-width: 500px;
             width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
         }
 
         .modal-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 15px;
+            font-size: 22px;
+            color: #333;
+            margin-bottom: 10px;
         }
 
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
-        label {
+        .form-group label {
             display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: #555;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
         }
 
-        input[type="text"], input[type="number"], textarea {
+        .form-group input, .form-group select {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
             font-size: 14px;
         }
 
-        .modal-buttons {
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-actions {
             display: flex;
             gap: 10px;
             margin-top: 20px;
         }
 
-        .modal-btn {
+        .btn-block {
             flex: 1;
-            padding: 12px;
+        }
+
+        .logout-btn {
+            background: #6b7280;
+            color: white;
+            padding: 10px 20px;
             border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
+            border-radius: 8px;
             cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
         }
 
-        .success-msg, .error-msg {
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            display: none;
-        }
-
-        .success-msg {
-            background: #dcfce7;
-            color: #166534;
-            border-left: 4px solid #10b981;
-        }
-
-        .error-msg {
-            background: #fee2e2;
-            color: #991b1b;
-            border-left: 4px solid #ef4444;
-        }
-
-        .success-msg.show, .error-msg.show {
-            display: block;
+        .logout-btn:hover {
+            background: #4b5563;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛠️ Admin Panel <span class="admin-badge">RESTRICTED ACCESS</span></h1>
-            <p class="subtitle">Manage tables, block seats, and view all assignments</p>
-            
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalTables">{{ total_tables }}</div>
-                    <div class="stat-label">Total Tables</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>🎛️ Admin Control Panel</h1>
+                    <p>Manage seating assignments and table configuration</p>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="blockedTables">0</div>
-                    <div class="stat-label">Blocked Tables</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="totalAssignments">0</div>
-                    <div class="stat-label">Total Assignments</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="availableSeats">{{ total_tables * seats_per_table }}</div>
-                    <div class="stat-label">Available Seats</div>
-                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
         </div>
 
-        <div class="main-content">
-            <div id="successMsg" class="success-msg"></div>
-            <div id="errorMsg" class="error-msg"></div>
-
-            <div class="section">
-                <div class="section-title">Quick Actions</div>
-                <div class="action-buttons">
-                    <button class="action-btn btn-primary" onclick="location.href='/'">← Back to Main Site</button>
-                    <button class="action-btn btn-danger" onclick="resetAllData()">Reset All Assignments</button>
-                </div>
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalGuests">0</div>
+                <div class="stat-label">Total Guests Seated</div>
             </div>
-
-            <div class="section">
-                <div class="section-title">🔍 Find Guest by Ticket Number</div>
-                <div style="display: flex; gap: 15px; align-items: flex-end;">
-                    <div style="flex: 1;">
-                        <label style="display: block; margin-bottom: 8px; font-size: 14px; color: #555;">Enter Ticket Number:</label>
-                        <input type="text" id="ticketLookup" placeholder="e.g., GALA-0001" 
-                            style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 14px; text-transform: uppercase;"
-                            onkeypress="if(event.key === 'Enter') searchTicket()">
-                    </div>
-                    <button class="action-btn btn-primary" onclick="searchTicket()" style="margin: 0;">Search</button>
-                </div>
-                <div id="lookupResult" style="margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 8px; display: none;">
-                    <!-- Result will appear here -->
-                </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalTables">{{ total_tables }}</div>
+                <div class="stat-label">Total Tables</div>
             </div>
-
-            <div class="section">
-                <div class="section-title">Table Management (Click to Block/Unblock)</div>
-                <div id="tablesGrid" class="tables-grid">
-                    <!-- Tables will be loaded here -->
-                </div>
+            <div class="stat-card">
+                <div class="stat-value" id="availableSeats">0</div>
+                <div class="stat-label">Available Seats</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" id="blockedTables">0</div>
+                <div class="stat-label">Blocked Tables</div>
+            </div>
+        </div>
 
-            <div class="section">
-                <div class="section-title">All Seat Assignments</div>
+        <!-- Controls -->
+        <div class="controls">
+            <h2>🔧 System Controls</h2>
+            <div class="button-group">
+                <button class="btn btn-danger" onclick="resetDemo()">Reset All Assignments</button>
+                <button class="btn btn-danger" onclick="resetTickets()">Reset Tickets (1-250)</button>
+                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh Data</button>
+            </div>
+        </div>
+
+        <!-- Table Management -->
+        <div class="section">
+            <h2>🪑 Table Management</h2>
+            <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+                Click a table to block/unblock or manually assign guests to blocked tables
+            </p>
+            <div class="table-grid" id="tableGrid">
+                <!-- Tables will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Ticket Lookup -->
+        <div class="section">
+            <h2>🔍 Ticket Lookup</h2>
+            <div class="search-box">
+                <input type="text" id="lookupInput" placeholder="Enter ticket number..." onkeyup="handleLookupKeyup(event)">
+            </div>
+            <div id="lookupResult"></div>
+        </div>
+
+        <!-- All Assignments -->
+        <div class="section">
+            <h2>📋 All Seat Assignments</h2>
+            <div style="overflow-x: auto;">
                 <table class="assignments-table">
                     <thead>
                         <tr>
                             <th>Table</th>
+                            <th>Ticket #</th>
                             <th>Guest Name</th>
-                            <th>Ticket</th>
                             <th>Assigned At</th>
                             <th>Action</th>
                         </tr>
@@ -432,60 +430,283 @@
     <!-- Block Table Modal -->
     <div id="blockModal" class="modal">
         <div class="modal-content">
-            <div class="modal-title">Block Table <span id="modalTableNum"></span></div>
-            <div class="form-group">
-                <label>Reason for blocking (optional):</label>
-                <input type="text" id="blockReason" placeholder="e.g., Reserved for VIP, Broken table">
+            <div class="modal-header">
+                <h2 class="modal-title" id="blockModalTitle">Block Table</h2>
             </div>
-            <div class="modal-buttons">
-                <button class="modal-btn btn-danger" onclick="confirmBlock()">Block Table</button>
-                <button class="modal-btn" style="background: #e5e7eb;" onclick="closeModal()">Cancel</button>
+            
+            <div class="form-group">
+                <label>Reason (optional)</label>
+                <input type="text" id="blockReason" placeholder="e.g., VIP, Reserved, Head Table">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary btn-block" onclick="closeBlockModal()">Cancel</button>
+                <button class="btn btn-danger btn-block" onclick="confirmBlock()">Block Table</button>
             </div>
         </div>
     </div>
 
-    <!-- Socket.IO -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Manual Assignment Modal (for blocked tables) -->
+    <div id="manualAssignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="manualAssignTitle">Manually Assign to Blocked Table</h2>
+                <p style="color: #666; font-size: 14px;">Add guests to this reserved table</p>
+            </div>
+            
+            <div class="form-group">
+                <label>Ticket Number</label>
+                <input type="text" id="manualTicketNumber" placeholder="Enter ticket number">
+            </div>
+
+            <div class="form-group">
+                <label>Guest Name</label>
+                <input type="text" id="manualGuestName" placeholder="Enter guest name">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary btn-block" onclick="closeManualAssignModal()">Cancel</button>
+                <button class="btn btn-success btn-block" onclick="confirmManualAssign()">Assign to Table</button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const socket = io();
-        let tablesData = [];
-        let selectedTable = null;
+        let socket;
+        let selectedTableNumber = null;
+        let tables = [];
 
-        socket.on('connect', function() {
-            console.log('Admin connected');
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocket();
+            loadAllData();
         });
 
-        socket.on('table_update', function(data) {
-            console.log('Tables updated');
-            tablesData = data.tables;
-            renderTables();
-            updateStats();
-        });
-
-        // Initial load
-        loadData();
-
-        async function loadData() {
-            await loadTables();
-            await loadAssignments();
+        // Socket.IO
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                console.log('Admin connected to server');
+            });
+            
+            socket.on('table_update', function(data) {
+                console.log('Table update received');
+                tables = data.tables;
+                renderTables();
+                updateStats();
+            });
         }
 
+        // Load all data
+        function loadAllData() {
+            loadTables();
+            loadAssignments();
+        }
+
+        // Refresh data
+        function refreshData() {
+            loadAllData();
+        }
+
+        // Load tables
         async function loadTables() {
             try {
                 const response = await fetch('/api/get-tables');
                 const data = await response.json();
                 
                 if (data.success) {
-                    tablesData = data.tables;
+                    tables = data.tables;
                     renderTables();
                     updateStats();
                 }
             } catch (error) {
-                showError('Failed to load tables');
+                console.error('Error loading tables:', error);
             }
         }
 
+        // Render tables
+        function renderTables() {
+            const grid = document.getElementById('tableGrid');
+            grid.innerHTML = '';
+            
+            tables.forEach(table => {
+                const btn = document.createElement('button');
+                btn.className = 'table-btn';
+                
+                if (table.is_blocked) {
+                    btn.classList.add('blocked');
+                    btn.innerHTML = `T${table.number}<br>🚫`;
+                } else if (table.is_full) {
+                    btn.classList.add('full');
+                    btn.innerHTML = `T${table.number}<br>${table.occupied}/${table.capacity}`;
+                } else {
+                    btn.innerHTML = `T${table.number}<br>${table.occupied}/${table.capacity}`;
+                }
+                
+                btn.onclick = () => handleTableClick(table);
+                
+                grid.appendChild(btn);
+            });
+        }
+
+        // Handle table click
+        function handleTableClick(table) {
+            selectedTableNumber = table.number;
+            
+            if (table.is_blocked) {
+                // Show options: Unblock or Manually Assign
+                const action = confirm(`Table ${table.number} is blocked.\n\nClick OK to MANUALLY ASSIGN guests\nClick Cancel to UNBLOCK this table`);
+                
+                if (action) {
+                    // Manually assign
+                    openManualAssignModal(table.number);
+                } else {
+                    // Unblock
+                    unblockTable(table.number);
+                }
+            } else {
+                // Block table
+                openBlockModal(table.number);
+            }
+        }
+
+        // Open block modal
+        function openBlockModal(tableNumber) {
+            selectedTableNumber = tableNumber;
+            document.getElementById('blockModalTitle').textContent = `Block Table ${tableNumber}`;
+            document.getElementById('blockReason').value = '';
+            document.getElementById('blockModal').classList.add('show');
+        }
+
+        // Close block modal
+        function closeBlockModal() {
+            document.getElementById('blockModal').classList.remove('show');
+            selectedTableNumber = null;
+        }
+
+        // Confirm block
+        async function confirmBlock() {
+            const reason = document.getElementById('blockReason').value.trim() || 'Reserved';
+            
+            try {
+                const response = await fetch('/api/admin/block-table', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        table_number: selectedTableNumber,
+                        reason: reason
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Table ${selectedTableNumber} blocked successfully`);
+                    closeBlockModal();
+                    loadTables();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Connection error');
+            }
+        }
+
+        // Unblock table
+        async function unblockTable(tableNumber) {
+            if (!confirm(`Unblock Table ${tableNumber}?`)) return;
+            
+            try {
+                const response = await fetch('/api/admin/unblock-table', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        table_number: tableNumber
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Table ${tableNumber} unblocked`);
+                    loadTables();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Connection error');
+            }
+        }
+
+        // Open manual assign modal
+        function openManualAssignModal(tableNumber) {
+            selectedTableNumber = tableNumber;
+            document.getElementById('manualAssignTitle').textContent = `Manually Assign to Table ${tableNumber}`;
+            document.getElementById('manualTicketNumber').value = '';
+            document.getElementById('manualGuestName').value = '';
+            document.getElementById('manualAssignModal').classList.add('show');
+        }
+
+        // Close manual assign modal
+        function closeManualAssignModal() {
+            document.getElementById('manualAssignModal').classList.remove('show');
+            selectedTableNumber = null;
+        }
+
+        // Confirm manual assign
+        async function confirmManualAssign() {
+            const ticketNumber = document.getElementById('manualTicketNumber').value.trim();
+            const guestName = document.getElementById('manualGuestName').value.trim();
+            
+            if (!ticketNumber || !guestName) {
+                alert('Please fill in both ticket number and guest name');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/manual-assign', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        table_number: selectedTableNumber,
+                        ticket_number: ticketNumber,
+                        full_name: guestName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Successfully assigned ${guestName} (Ticket #${ticketNumber}) to Table ${selectedTableNumber}`);
+                    closeManualAssignModal();
+                    loadAllData();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Connection error: ' + error.message);
+            }
+        }
+
+        // Update stats
+        function updateStats() {
+            const totalGuests = tables.reduce((sum, t) => sum + t.occupied, 0);
+            const availableSeats = tables.reduce((sum, t) => sum + t.available, 0);
+            const blockedCount = tables.filter(t => t.is_blocked).length;
+            
+            document.getElementById('totalGuests').textContent = totalGuests;
+            document.getElementById('availableSeats').textContent = availableSeats;
+            document.getElementById('blockedTables').textContent = blockedCount;
+        }
+
+        // Load assignments
         async function loadAssignments() {
             try {
                 const response = await fetch('/api/admin/get-all-assignments');
@@ -495,46 +716,11 @@
                     renderAssignments(data.assignments);
                 }
             } catch (error) {
-                showError('Failed to load assignments');
+                console.error('Error loading assignments:', error);
             }
         }
 
-        function renderTables() {
-            const grid = document.getElementById('tablesGrid');
-            grid.innerHTML = '';
-
-            tablesData.forEach(table => {
-                const card = document.createElement('div');
-                
-                let className = 'table-card';
-                let statusText = '';
-                let buttonHtml = '';
-                
-                if (table.is_blocked) {
-                    className += ' blocked';
-                    statusText = `🚫 ${table.block_reason || 'Blocked'}`;
-                    buttonHtml = `<button class="unblock-btn" onclick="unblockTable(${table.number})">Unblock</button>`;
-                } else if (table.is_full) {
-                    className += ' full';
-                    statusText = `⚠️ Full (${table.occupied}/${table.capacity})`;
-                    buttonHtml = `<button class="block-btn" onclick="openBlockModal(${table.number})">Block</button>`;
-                } else {
-                    className += ' available';
-                    statusText = `✓ ${table.occupied}/${table.capacity} occupied`;
-                    buttonHtml = `<button class="block-btn" onclick="openBlockModal(${table.number})">Block</button>`;
-                }
-                
-                card.className = className;
-                card.innerHTML = `
-                    <div class="table-number">Table ${table.number}</div>
-                    <div class="table-status">${statusText}</div>
-                    ${buttonHtml}
-                `;
-                
-                grid.appendChild(card);
-            });
-        }
-
+        // Render assignments
         function renderAssignments(assignments) {
             const tbody = document.getElementById('assignmentsBody');
             
@@ -542,228 +728,140 @@
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No assignments yet</td></tr>';
                 return;
             }
-
-            tbody.innerHTML = assignments.map(a => `
-                <tr>
-                    <td><strong>Table ${a.table_number}</strong></td>
-                    <td>${a.full_name}</td>
-                    <td>${a.ticket_number}</td>
-                    <td>${new Date(a.assigned_at).toLocaleString()}</td>
-                    <td>
-                        <button class="delete-btn-small" onclick="deleteAssignment(${a.id})">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        function updateStats() {
-            const blocked = tablesData.filter(t => t.is_blocked).length;
-            const totalAssigned = tablesData.reduce((sum, t) => sum + t.occupied, 0);
-            const totalCapacity = tablesData.reduce((sum, t) => sum + t.capacity, 0);
-            const available = totalCapacity - totalAssigned;
-
-            document.getElementById('blockedTables').textContent = blocked;
-            document.getElementById('totalAssignments').textContent = totalAssigned;
-            document.getElementById('availableSeats').textContent = available;
-        }
-
-        function openBlockModal(tableNum) {
-            selectedTable = tableNum;
-            document.getElementById('modalTableNum').textContent = tableNum;
-            document.getElementById('blockReason').value = '';
-            document.getElementById('blockModal').classList.add('show');
-        }
-
-        function closeModal() {
-            document.getElementById('blockModal').classList.remove('show');
-            selectedTable = null;
-        }
-
-        async function confirmBlock() {
-            const reason = document.getElementById('blockReason').value || 'Reserved';
             
-            try {
-                const response = await fetch('/api/admin/block-table', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        table_number: selectedTable,
-                        reason: reason
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showSuccess(`Table ${selectedTable} blocked successfully`);
-                    closeModal();
-                } else {
-                    showError(data.error);
-                }
-            } catch (error) {
-                showError('Failed to block table');
-            }
+            tbody.innerHTML = '';
+            
+            assignments.forEach(assignment => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>Table ${assignment.table_number}</strong></td>
+                    <td>#${assignment.ticket_number}</td>
+                    <td>${assignment.full_name}</td>
+                    <td>${new Date(assignment.assigned_at).toLocaleString()}</td>
+                    <td>
+                        <button class="delete-btn" onclick="deleteAssignment(${assignment.id})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
-        async function unblockTable(tableNum) {
-            if (!confirm(`Unblock Table ${tableNum}?`)) return;
-
-            try {
-                const response = await fetch('/api/admin/unblock-table', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({table_number: tableNum})
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showSuccess(`Table ${tableNum} unblocked`);
-                } else {
-                    showError(data.error);
-                }
-            } catch (error) {
-                showError('Failed to unblock table');
-            }
-        }
-
+        // Delete assignment
         async function deleteAssignment(assignmentId) {
             if (!confirm('Delete this assignment?')) return;
-
+            
             try {
                 const response = await fetch('/api/admin/delete-any-assignment', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({assignment_id: assignmentId})
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ assignment_id: assignmentId })
                 });
-
+                
                 const data = await response.json();
-
+                
                 if (data.success) {
-                    showSuccess('Assignment deleted');
-                    loadAssignments();
+                    loadAllData();
                 } else {
-                    showError(data.error);
+                    alert('Error: ' + data.error);
                 }
             } catch (error) {
-                showError('Failed to delete assignment');
+                alert('Connection error');
             }
         }
 
-        async function resetAllData() {
-            if (!confirm('⚠️ WARNING: This will delete ALL seat assignments!\n\nAre you absolutely sure?')) return;
+        // Ticket lookup
+        function handleLookupKeyup(event) {
+            if (event.key === 'Enter') {
+                lookupTicket();
+            }
+        }
+
+        async function lookupTicket() {
+            const ticketNumber = document.getElementById('lookupInput').value.trim();
+            const resultDiv = document.getElementById('lookupResult');
+            
+            if (!ticketNumber) {
+                resultDiv.innerHTML = '';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/lookup-ticket?ticket=${encodeURIComponent(ticketNumber)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.assignment) {
+                        resultDiv.className = 'lookup-result';
+                        resultDiv.innerHTML = `
+                            <strong>✅ Found!</strong><br>
+                            Ticket #${data.assignment.ticket_number}<br>
+                            Guest: ${data.assignment.full_name}<br>
+                            Table: <strong>Table ${data.assignment.table_number}</strong><br>
+                            Assigned: ${new Date(data.assignment.assigned_at).toLocaleString()}
+                        `;
+                    } else if (data.ticket_exists) {
+                        resultDiv.className = 'lookup-result';
+                        resultDiv.innerHTML = `
+                            <strong>⚠️ Ticket exists but not assigned</strong><br>
+                            Guest: ${data.guest_name}
+                        `;
+                    } else {
+                        resultDiv.className = 'lookup-result not-found';
+                        resultDiv.innerHTML = '<strong>❌ Ticket not found</strong>';
+                    }
+                } else {
+                    resultDiv.className = 'lookup-result not-found';
+                    resultDiv.innerHTML = '<strong>Error:</strong> ' + data.error;
+                }
+            } catch (error) {
+                resultDiv.className = 'lookup-result not-found';
+                resultDiv.innerHTML = '<strong>Connection error</strong>';
+            }
+        }
+
+        // Reset demo
+        async function resetDemo() {
+            if (!confirm('⚠️ Reset ALL assignments? This cannot be undone!')) return;
             
             try {
                 const response = await fetch('/admin/reset-demo');
                 const data = await response.json();
-
+                
                 if (data.success) {
-                    showSuccess('All assignments reset');
-                    loadData();
+                    alert('All assignments reset!');
+                    loadAllData();
                 } else {
-                    showError(data.error);
+                    alert('Error: ' + data.error);
                 }
             } catch (error) {
-                showError('Failed to reset');
+                alert('Connection error');
             }
         }
 
-        function showSuccess(message) {
-            const el = document.getElementById('successMsg');
-            el.textContent = message;
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 5000);
-        }
-
-        function showError(message) {
-            const el = document.getElementById('errorMsg');
-            el.textContent = message;
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 5000);
-        }
-
-        async function searchTicket() {
-            const ticketInput = document.getElementById('ticketLookup');
-            const ticketNumber = ticketInput.value.trim().toUpperCase();
-            const resultDiv = document.getElementById('lookupResult');
-
-            if (!ticketNumber) {
-                showError('Please enter a ticket number');
-                return;
-            }
-
+        // Reset tickets
+        async function resetTickets() {
+            if (!confirm('⚠️ Reset ALL tickets (1-250)? This will delete all assignments!')) return;
+            
             try {
-                const response = await fetch(`/api/admin/lookup-ticket?ticket=${encodeURIComponent(ticketNumber)}`);
+                const response = await fetch('/admin/reset-tickets');
                 const data = await response.json();
-
+                
                 if (data.success) {
-                    if (data.assignment) {
-                        // Found assignment
-                        resultDiv.innerHTML = `
-                            <div style="display: flex; align-items: center; gap: 20px;">
-                                <div style="flex: 1;">
-                                    <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 5px;">
-                                        ✅ ${data.assignment.full_name}
-                                    </div>
-                                    <div style="color: #666; font-size: 14px; margin-bottom: 3px;">
-                                        Ticket: ${data.assignment.ticket_number}
-                                    </div>
-                                    <div style="color: #667eea; font-size: 16px; font-weight: 600;">
-                                        📍 Table ${data.assignment.table_number}
-                                    </div>
-                                    <div style="color: #999; font-size: 12px; margin-top: 5px;">
-                                        Assigned: ${new Date(data.assignment.assigned_at).toLocaleString()}
-                                    </div>
-                                </div>
-                                <button class="delete-btn-small" onclick="deleteAssignment(${data.assignment.id})" 
-                                    style="padding: 8px 16px; font-size: 13px;">
-                                    Delete Assignment
-                                </button>
-                            </div>
-                        `;
-                        resultDiv.style.display = 'block';
-                        resultDiv.style.background = '#dcfce7';
-                        resultDiv.style.borderLeft = '4px solid #10b981';
-                    } else if (data.ticket_exists) {
-                        // Ticket exists but not assigned
-                        resultDiv.innerHTML = `
-                            <div style="text-align: center;">
-                                <div style="font-size: 18px; font-weight: 700; color: #f59e0b; margin-bottom: 5px;">
-                                    ⚠️ Ticket Not Assigned
-                                </div>
-                                <div style="color: #666; font-size: 14px;">
-                                    Ticket <strong>${ticketNumber}</strong> exists but hasn't been assigned to a table yet.
-                                </div>
-                                <div style="color: #999; font-size: 13px; margin-top: 5px;">
-                                    Guest name: ${data.guest_name}
-                                </div>
-                            </div>
-                        `;
-                        resultDiv.style.display = 'block';
-                        resultDiv.style.background = '#fef3c7';
-                        resultDiv.style.borderLeft = '4px solid #f59e0b';
-                    } else {
-                        // Ticket doesn't exist
-                        resultDiv.innerHTML = `
-                            <div style="text-align: center;">
-                                <div style="font-size: 18px; font-weight: 700; color: #ef4444; margin-bottom: 5px;">
-                                    ❌ Ticket Not Found
-                                </div>
-                                <div style="color: #666; font-size: 14px;">
-                                    Ticket <strong>${ticketNumber}</strong> does not exist in the system.
-                                </div>
-                            </div>
-                        `;
-                        resultDiv.style.display = 'block';
-                        resultDiv.style.background = '#fee2e2';
-                        resultDiv.style.borderLeft = '4px solid #ef4444';
-                    }
+                    alert(data.message);
+                    loadAllData();
                 } else {
-                    showError(data.error || 'Search failed');
+                    alert('Error: ' + data.error);
                 }
             } catch (error) {
-                showError('Connection error. Please try again.');
+                alert('Connection error');
             }
+        }
+
+        // Logout
+        function logout() {
+            window.location.href = '/admin/logout';
         }
     </script>
 </body>
