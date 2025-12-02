@@ -15,10 +15,10 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
 
         .container {
@@ -30,131 +30,118 @@
             padding: 40px;
         }
 
-        h1 {
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
             color: #333;
             font-size: 28px;
             margin-bottom: 10px;
-            text-align: center;
         }
 
-        .subtitle {
+        .header p {
             color: #666;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 14px;
+            font-size: 15px;
         }
 
-        .info-box {
-            background: #f0f4ff;
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            margin-bottom: 25px;
-            border-radius: 4px;
-        }
-
-        .info-box p {
-            color: #555;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-
-        .guest-entries {
-            margin-bottom: 20px;
-        }
-
-        .guest-entry {
+        .ticket-group {
             background: #f9fafb;
             border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 15px;
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 15px;
             position: relative;
         }
 
-        .guest-entry h3 {
-            color: #667eea;
-            font-size: 14px;
-            margin-bottom: 12px;
+        .ticket-group.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .ticket-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .ticket-number-label {
             font-weight: 600;
+            color: #667eea;
+            font-size: 16px;
         }
 
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        label {
-            display: block;
-            color: #555;
-            font-size: 13px;
-            font-weight: 500;
-            margin-bottom: 6px;
-        }
-
-        input[type="text"],
-        input[type="number"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        input[type="text"]:focus,
-        input[type="number"]:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .remove-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
+        .remove-ticket-btn {
             background: #ef4444;
             color: white;
             border: none;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
+            padding: 6px 12px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
+            font-size: 12px;
+            font-weight: 600;
         }
 
-        .remove-btn:hover {
+        .remove-ticket-btn:hover {
             background: #dc2626;
-            transform: scale(1.1);
         }
 
-        .add-guest-btn {
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .form-group input {
             width: 100%;
             padding: 12px;
-            background: #f3f4f6;
-            border: 2px dashed #9ca3af;
+            border: 2px solid #e5e7eb;
             border-radius: 8px;
-            color: #6b7280;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
         }
 
-        .add-guest-btn:hover {
-            background: #e5e7eb;
+        .form-group input:focus {
+            outline: none;
             border-color: #667eea;
-            color: #667eea;
+        }
+
+        .form-group input.error {
+            border-color: #ef4444;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+
+        .add-ticket-btn {
+            width: 100%;
+            padding: 14px;
+            background: #f3f4f6;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            color: #6b7280;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 15px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .add-ticket-btn:hover {
+            background: #e5e7eb;
+            border-color: #9ca3af;
         }
 
         .submit-btn {
@@ -168,7 +155,6 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            margin-top: 20px;
         }
 
         .submit-btn:hover {
@@ -182,213 +168,246 @@
             transform: none;
         }
 
-        .error-message {
-            background: #fee2e2;
-            border-left: 4px solid #ef4444;
-            color: #991b1b;
-            padding: 12px;
-            border-radius: 4px;
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
             margin-bottom: 20px;
             font-size: 14px;
-            display: none;
         }
 
-        .error-message.show {
-            display: block;
+        .alert-error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
         }
 
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .loading.show {
-            display: block;
-        }
-
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 25px;
-            }
-
-            h1 {
-                font-size: 24px;
-            }
+        .alert-warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #78350f;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎊 Gala Seating Registration</h1>
-        <p class="subtitle">Register your tickets to select your seats</p>
-
-        <div class="info-box">
-            <p><strong>Instructions:</strong> Enter the full name and ticket number for each person in your party. You'll be able to assign table seats in the next step.</p>
+        <div class="header">
+            <h1>🎊 Gala Seating Registration</h1>
+            <p>Enter your ticket information to select your seats</p>
         </div>
 
-        <div id="errorMessage" class="error-message"></div>
+        <div id="errorAlert" style="display: none;"></div>
 
-        <form id="registrationForm">
-            <div id="guestEntries" class="guest-entries">
-                <!-- Guest entries will be added here -->
+        <form id="ticketForm">
+            <div id="ticketsContainer">
+                <!-- Ticket fields will be added here -->
             </div>
 
-            <button type="button" class="add-guest-btn" id="addGuestBtn">
-                <span>➕</span>
-                <span>Add Another Person</span>
+            <button type="button" class="add-ticket-btn" onclick="addTicketField()">
+                + Add Another Ticket
             </button>
 
             <button type="submit" class="submit-btn" id="submitBtn">
-                Continue to Seat Selection →
+                Continue to Seat Selection
             </button>
         </form>
-
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p>Validating tickets...</p>
-        </div>
     </div>
 
     <script>
-        let guestCount = 0;
+        let ticketCount = 0;
 
-        // Add initial guest entry
-        addGuestEntry();
-
-        // Add guest entry
-        document.getElementById('addGuestBtn').addEventListener('click', function() {
-            addGuestEntry();
+        // Initialize with one ticket field
+        document.addEventListener('DOMContentLoaded', function() {
+            addTicketField();
         });
 
-        function addGuestEntry() {
-            guestCount++;
-            const entriesDiv = document.getElementById('guestEntries');
+        // Add ticket field
+        function addTicketField() {
+            ticketCount++;
             
-            const entryDiv = document.createElement('div');
-            entryDiv.className = 'guest-entry';
-            entryDiv.id = `guest-${guestCount}`;
+            const container = document.getElementById('ticketsContainer');
             
-            entryDiv.innerHTML = `
-                <h3>Person ${guestCount}</h3>
-                ${guestCount > 1 ? '<button type="button" class="remove-btn" onclick="removeGuest(' + guestCount + ')">×</button>' : ''}
-                <div class="form-group">
-                    <label for="name-${guestCount}">Full Name</label>
-                    <input type="text" id="name-${guestCount}" name="full_name" required placeholder="e.g., John Smith">
+            const ticketGroup = document.createElement('div');
+            ticketGroup.className = 'ticket-group';
+            ticketGroup.id = `ticket-group-${ticketCount}`;
+            
+            ticketGroup.innerHTML = `
+                <div class="ticket-group-header">
+                    <span class="ticket-number-label">Ticket ${ticketCount}</span>
+                    ${ticketCount > 1 ? `<button type="button" class="remove-ticket-btn" onclick="removeTicketField(${ticketCount})">Remove</button>` : ''}
                 </div>
+                
                 <div class="form-group">
-                    <label for="ticket-${guestCount}">Ticket Number</label>
-                    <input type="number" id="ticket-${guestCount}" name="ticket_number" required placeholder="e.g., 123" min="1" max="250">
+                    <label>Ticket Number</label>
+                    <input 
+                        type="text" 
+                        name="ticket_number_${ticketCount}" 
+                        id="ticket_number_${ticketCount}"
+                        placeholder="Enter your ticket number" 
+                        required
+                        oninput="clearError(${ticketCount})">
+                    <div class="error-message" id="error_ticket_${ticketCount}" style="display: none;"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input 
+                        type="text" 
+                        name="full_name_${ticketCount}" 
+                        id="full_name_${ticketCount}"
+                        placeholder="Enter guest full name" 
+                        required>
                 </div>
             `;
             
-            entriesDiv.appendChild(entryDiv);
+            container.appendChild(ticketGroup);
         }
 
-        function removeGuest(id) {
-            const element = document.getElementById(`guest-${id}`);
-            if (element) {
-                element.remove();
-                renumberGuests();
+        // Remove ticket field
+        function removeTicketField(id) {
+            const ticketGroup = document.getElementById(`ticket-group-${id}`);
+            if (ticketGroup) {
+                ticketGroup.remove();
             }
         }
 
-        function renumberGuests() {
-            const entries = document.querySelectorAll('.guest-entry');
-            entries.forEach((entry, index) => {
-                const heading = entry.querySelector('h3');
-                if (heading) {
-                    heading.textContent = `Person ${index + 1}`;
-                }
-            });
+        // Clear error
+        function clearError(id) {
+            const group = document.getElementById(`ticket-group-${id}`);
+            const input = document.getElementById(`ticket_number_${id}`);
+            const errorDiv = document.getElementById(`error_ticket_${id}`);
+            
+            if (group) group.classList.remove('error');
+            if (input) input.classList.remove('error');
+            if (errorDiv) errorDiv.style.display = 'none';
+            
+            document.getElementById('errorAlert').style.display = 'none';
         }
 
-        // Form submission
-        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+        // Show error
+        function showError(id, message) {
+            const group = document.getElementById(`ticket-group-${id}`);
+            const input = document.getElementById(`ticket_number_${id}`);
+            const errorDiv = document.getElementById(`error_ticket_${id}`);
+            
+            if (group) group.classList.add('error');
+            if (input) input.classList.add('error');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Show alert
+        function showAlert(message, type = 'error') {
+            const alertDiv = document.getElementById('errorAlert');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = `<strong>⚠️ Error:</strong> ${message}`;
+            alertDiv.style.display = 'block';
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Handle form submission
+        document.getElementById('ticketForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Hide error
-            hideError();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Validating...';
             
-            // Collect all ticket data
-            const entries = document.querySelectorAll('.guest-entry');
+            // Clear all errors
+            document.querySelectorAll('.ticket-group').forEach(g => g.classList.remove('error'));
+            document.querySelectorAll('input[type="text"]').forEach(i => i.classList.remove('error'));
+            document.querySelectorAll('.error-message').forEach(e => e.style.display = 'none');
+            document.getElementById('errorAlert').style.display = 'none';
+            
+            // Collect ticket data
             const tickets = [];
+            const ticketNumbers = [];
+            let hasError = false;
             
-            for (let entry of entries) {
-                const fullName = entry.querySelector('input[name="full_name"]').value.trim();
-                const ticketNumber = entry.querySelector('input[name="ticket_number"]').value.trim();
+            for (let i = 1; i <= ticketCount; i++) {
+                const ticketInput = document.getElementById(`ticket_number_${i}`);
+                const nameInput = document.getElementById(`full_name_${i}`);
                 
-                if (!fullName || !ticketNumber) {
-                    showError('Please fill out all fields');
-                    return;
+                if (ticketInput && nameInput) {
+                    const ticketNumber = ticketInput.value.trim();
+                    const fullName = nameInput.value.trim();
+                    
+                    if (ticketNumber && fullName) {
+                        // Check for duplicates in current entry
+                        if (ticketNumbers.includes(ticketNumber)) {
+                            showError(i, 'This ticket number is already entered above!');
+                            hasError = true;
+                        }
+                        
+                        tickets.push({
+                            ticket_number: ticketNumber,
+                            full_name: fullName
+                        });
+                        ticketNumbers.push(ticketNumber);
+                    }
                 }
-                
-                tickets.push({
-                    full_name: fullName,
-                    ticket_number: ticketNumber
-                });
             }
             
-            if (tickets.length === 0) {
-                showError('Please add at least one person');
+            if (hasError) {
+                showAlert('You have entered duplicate ticket numbers. Please check and fix the highlighted fields.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Continue to Seat Selection';
                 return;
             }
             
-            // Show loading
-            document.getElementById('loading').classList.add('show');
-            document.getElementById('submitBtn').disabled = true;
+            if (tickets.length === 0) {
+                showAlert('Please enter at least one ticket.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Continue to Seat Selection';
+                return;
+            }
             
+            // Validate with server
             try {
                 const response = await fetch('/api/validate-tickets', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ tickets })
+                    body: JSON.stringify({ tickets: tickets })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Redirect to seating page
                     window.location.href = data.redirect;
                 } else {
-                    showError(data.error || 'Validation failed');
-                    document.getElementById('loading').classList.remove('show');
-                    document.getElementById('submitBtn').disabled = false;
+                    // Parse error message to highlight specific ticket
+                    const errorMsg = data.error;
+                    
+                    // Try to extract ticket number from error
+                    const ticketMatch = errorMsg.match(/Ticket (\S+)/);
+                    if (ticketMatch) {
+                        const problemTicket = ticketMatch[1];
+                        
+                        // Find and highlight the problematic ticket
+                        for (let i = 1; i <= ticketCount; i++) {
+                            const ticketInput = document.getElementById(`ticket_number_${i}`);
+                            if (ticketInput && ticketInput.value.trim() === problemTicket) {
+                                showError(i, errorMsg);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    showAlert(errorMsg);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Continue to Seat Selection';
                 }
             } catch (error) {
-                showError('Connection error. Please try again.');
-                document.getElementById('loading').classList.remove('show');
-                document.getElementById('submitBtn').disabled = false;
+                showAlert('Connection error. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Continue to Seat Selection';
             }
         });
-
-        function showError(message) {
-            const errorDiv = document.getElementById('errorMessage');
-            errorDiv.textContent = message;
-            errorDiv.classList.add('show');
-            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-
-        function hideError() {
-            document.getElementById('errorMessage').classList.remove('show');
-        }
     </script>
 </body>
 </html>
