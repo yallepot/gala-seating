@@ -152,9 +152,21 @@
             <p>🎊 <strong>See you at the gala!</strong> Please proceed to your assigned table when you arrive. Have a wonderful evening!</p>
         </div>
 
-        <button class="close-btn" onclick="window.close()">
+        <button class="close-btn" onclick="closeWindow()">
             Close Window
         </button>
     </div>
+
+    <script>
+        function closeWindow() {
+            // Try to close the window
+            window.close();
+            
+            // If window.close() doesn't work (browser security), redirect to home
+            setTimeout(function() {
+                window.location.href = '/';
+            }, 100);
+        }
+    </script>
 </body>
 </html>
