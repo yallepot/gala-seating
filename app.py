@@ -1,7 +1,7 @@
 """
 Gala Seating System - Main Application
 Real-time seating assignment with WebSocket support
-FULLY DEBUGGED VERSION 1.0 - All bugs fixed
+FULLY DEBUGGED VERSION 1.2 - All bugs fixed
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
@@ -756,3 +756,63 @@ init_database()
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
+
+@app.route('/api/admin/manual-assign', methods=['POST'])
+@require_admin
+def manual_assign_api():
+    """Manually assign a guest to a table (even if blocked) - ADMIN ONLY"""
+    try:
+        table_number = request.json.get('table_number')
+        ticket_number = request.json.get('ticket_number')
+        full_name = request.json.get('full_name')
+        
+        if not table_number or not ticket_number or not full_name:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        if table_number < 1 or table_number > TOTAL_TABLES:
+            return jsonify({'success': False, 'error': 'Invalid table number'}), 400
+        
+        # Check if ticket is already assigned
+        existing = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
+        if existing:
+            return jsonify({
+                'success': False, 
+                'error': f'Ticket {ticket_number} is already assigned to Table {existing.table_number}'
+            }), 400
+        
+        # Check table capacity (even for blocked tables)
+        current_count = TableAssignment.query.filter_by(table_number=table_number).count()
+        if current_count >= SEATS_PER_TABLE:
+            return jsonify({
+                'success': False,
+                'error': f'Table {table_number} is full ({current_count}/{SEATS_PER_TABLE})'
+            }), 400
+        
+        # Create assignment
+        new_assignment = TableAssignment(
+            ticket_number=ticket_number,
+            full_name=full_name,
+            table_number=table_number
+        )
+        db.session.add(new_assignment)
+        
+        # Mark ticket as used if it exists
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        if ticket:
+            ticket.is_used = True
+            ticket.used_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        # Broadcast update
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully assigned to Table {table_number}'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
