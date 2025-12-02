@@ -725,7 +725,7 @@
             const tbody = document.getElementById('assignmentsBody');
             
             if (assignments.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No assignments yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No assignments yet</td></tr>';
                 return;
             }
             
@@ -739,10 +739,60 @@
                     <td>${assignment.full_name}</td>
                     <td>${new Date(assignment.assigned_at).toLocaleString()}</td>
                     <td>
+                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; margin-right: 5px;" onclick="editAssignment(${assignment.id}, '${assignment.ticket_number}', '${assignment.full_name}', ${assignment.table_number})">Edit</button>
                         <button class="delete-btn" onclick="deleteAssignment(${assignment.id})">Delete</button>
                     </td>
                 `;
                 tbody.appendChild(row);
+            });
+        }
+        
+        // Edit assignment
+        function editAssignment(assignmentId, currentTicket, currentName, currentTable) {
+            const newTicket = prompt(`Edit Ticket Number:\n\nCurrent: ${currentTicket}\n\nEnter new ticket number (or leave blank to keep current):`, currentTicket);
+            if (newTicket === null) return; // Cancelled
+            
+            const newName = prompt(`Edit Guest Name:\n\nCurrent: ${currentName}\n\nEnter new name (or leave blank to keep current):`, currentName);
+            if (newName === null) return; // Cancelled
+            
+            const newTable = prompt(`Edit Table Number:\n\nCurrent: Table ${currentTable}\n\nEnter new table number (or leave blank to keep current):`, currentTable);
+            if (newTable === null) return; // Cancelled
+            
+            const data = {
+                assignment_id: assignmentId
+            };
+            
+            if (newTicket && newTicket.trim() !== currentTicket) {
+                data.ticket_number = newTicket.trim();
+            }
+            
+            if (newName && newName.trim() !== currentName) {
+                data.full_name = newName.trim();
+            }
+            
+            if (newTable && parseInt(newTable) !== currentTable) {
+                data.table_number = parseInt(newTable);
+            }
+            
+            // Send update
+            fetch('/api/admin/edit-assignment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Assignment updated successfully!');
+                    loadAllData();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Connection error: ' + error.message);
             });
         }
 
