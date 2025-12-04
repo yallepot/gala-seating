@@ -262,6 +262,39 @@ def confirmation():
     
     return render_template('confirmation.html', assignments=assignments)
 
+# Usher routes
+@app.route('/usher')
+def usher():
+    """Usher view - real-time table status"""
+    return render_template('usher.html', total_tables=TOTAL_TABLES)
+
+@app.route('/api/usher/lookup-ticket')
+def usher_lookup_ticket():
+    """Look up a ticket for ushers"""
+    try:
+        ticket_number = request.args.get('ticket')
+        
+        if not ticket_number:
+            return jsonify({'success': False, 'error': 'Ticket number required'}), 400
+        
+        assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
+        
+        if assignment:
+            return jsonify({
+                'success': True,
+                'found': True,
+                'assignment': assignment.to_dict()
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'found': False,
+                'message': f'Ticket {ticket_number} not found or not assigned'
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # Admin routes
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
