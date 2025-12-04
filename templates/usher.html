@@ -242,6 +242,42 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
+        .sort-controls {
+            padding: 15px;
+            background: #f9fafb;
+            border-bottom: 2px solid #e5e7eb;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .sort-label {
+            font-weight: 600;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .sort-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .sort-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .sort-btn:hover:not(.active) {
+            border-color: #667eea;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -307,7 +343,7 @@
         <div class="search-section">
             <h2 style="margin-bottom: 15px; color: #333;">🔍 Find Guest</h2>
             <div class="search-box">
-                <input type="number" class="search-input" id="ticketSearch" placeholder="Enter ticket number (e.g., 123)" min="1" max="250">
+                <input type="text" class="search-input" id="ticketSearch" placeholder="Enter ticket number">
                 <button class="btn btn-primary" onclick="lookupTicket()">Search</button>
             </div>
             <div id="searchResult" class="search-result"></div>
@@ -326,6 +362,11 @@
 
         <div id="listView" class="tab-content">
             <div class="assignments-table">
+                <div class="sort-controls">
+                    <span class="sort-label">Sort by:</span>
+                    <button class="sort-btn active" onclick="sortBy('table')">Table Number</button>
+                    <button class="sort-btn" onclick="sortBy('ticket')">Ticket Number</button>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -354,9 +395,11 @@
         let socket;
         let tables = [];
         let assignments = [];
+        let currentSort = 'table'; // 'table' or 'ticket'
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, initializing...');
             initializeSocket();
             loadTables();
             loadAssignments();
@@ -367,13 +410,19 @@
             socket = io();
             
             socket.on('connect', function() {
-                console.log('Connected to server');
+                console.log('Usher connected to server');
             });
             
             socket.on('table_update', function(data) {
+                console.log('Table update received');
                 tables = data.tables;
                 renderTables();
                 updateStats();
+                loadAssignments(); // Refresh assignments when tables update
+            });
+
+            socket.on('connect_error', function(error) {
+                console.error('Connection error:', error);
             });
         }
 
@@ -394,14 +443,19 @@
 
         // Load tables
         async function loadTables() {
+            console.log('Loading tables...');
             try {
                 const response = await fetch('/api/usher/get-tables');
                 const data = await response.json();
+                
+                console.log('Tables response:', data);
                 
                 if (data.success) {
                     tables = data.tables;
                     renderTables();
                     updateStats();
+                } else {
+                    console.error('Failed to load tables:', data.error);
                 }
             } catch (error) {
                 console.error('Error loading tables:', error);
@@ -412,6 +466,11 @@
         function renderTables() {
             const grid = document.getElementById('tablesGrid');
             grid.innerHTML = '';
+            
+            if (!tables || tables.length === 0) {
+                grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🪑</div><p>No tables available</p></div>';
+                return;
+            }
             
             tables.forEach(table => {
                 const card = document.createElement('div');
@@ -468,17 +527,33 @@
 
         // Load assignments
         async function loadAssignments() {
+            console.log('Loading assignments...');
             try {
                 const response = await fetch('/api/usher/get-all-assignments');
                 const data = await response.json();
                 
+                console.log('Assignments response:', data);
+                
                 if (data.success) {
                     assignments = data.assignments;
                     renderAssignments();
+                } else {
+                    console.error('Failed to load assignments:', data.error);
                 }
             } catch (error) {
                 console.error('Error loading assignments:', error);
             }
+        }
+
+        // Sort assignments
+        function sortBy(sortType) {
+            currentSort = sortType;
+            
+            // Update button states
+            document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderAssignments();
         }
 
         // Render assignments table
@@ -486,7 +561,7 @@
             const tbody = document.getElementById('assignmentsTable');
             tbody.innerHTML = '';
             
-            if (assignments.length === 0) {
+            if (!assignments || assignments.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="4">
@@ -500,7 +575,25 @@
                 return;
             }
             
-            assignments.forEach(assignment => {
+            // Sort assignments
+            let sortedAssignments = [...assignments];
+            
+            if (currentSort === 'table') {
+                sortedAssignments.sort((a, b) => {
+                    if (a.table_number !== b.table_number) {
+                        return a.table_number - b.table_number;
+                    }
+                    return new Date(a.assigned_at) - new Date(b.assigned_at);
+                });
+            } else {
+                sortedAssignments.sort((a, b) => {
+                    const ticketA = String(a.ticket_number);
+                    const ticketB = String(b.ticket_number);
+                    return ticketA.localeCompare(ticketB, undefined, { numeric: true });
+                });
+            }
+            
+            sortedAssignments.forEach(assignment => {
                 const row = document.createElement('tr');
                 const date = new Date(assignment.assigned_at);
                 const formattedDate = date.toLocaleString();
@@ -527,14 +620,16 @@
                 return;
             }
             
+            console.log('Looking up ticket:', ticketNumber);
+            
             try {
-                const response = await fetch(`/api/usher/lookup-ticket?ticket=${ticketNumber}`);
+                const response = await fetch(`/api/usher/lookup-ticket?ticket=${encodeURIComponent(ticketNumber)}`);
                 const data = await response.json();
                 
+                console.log('Lookup response:', data);
+                
                 if (data.success) {
-                    if (!data.ticket_exists) {
-                        resultDiv.innerHTML = `<p style="color: #ef4444;">❌ Ticket #${ticketNumber} not found in system</p>`;
-                    } else if (data.assignment) {
+                    if (data.found && data.assignment) {
                         resultDiv.innerHTML = `
                             <div class="result-highlight">✅ Table ${data.assignment.table_number}</div>
                             <p><strong>Guest:</strong> ${data.assignment.full_name}</p>
@@ -542,8 +637,7 @@
                         `;
                     } else {
                         resultDiv.innerHTML = `
-                            <p style="color: #f59e0b;">⚠️ Ticket #${ticketNumber} is valid but not yet assigned</p>
-                            <p><strong>Guest:</strong> ${data.guest_name}</p>
+                            <p style="color: #f59e0b;">⚠️ Ticket #${ticketNumber} not found or not yet assigned</p>
                         `;
                     }
                     resultDiv.classList.add('show');
@@ -552,6 +646,7 @@
                     resultDiv.classList.add('show');
                 }
             } catch (error) {
+                console.error('Lookup error:', error);
                 resultDiv.innerHTML = `<p style="color: #ef4444;">Connection error. Please try again.</p>`;
                 resultDiv.classList.add('show');
             }
