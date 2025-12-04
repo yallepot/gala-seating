@@ -1,7 +1,7 @@
 """
 Gala Seating System - Main Application
 Real-time seating assignment with WebSocket support
-FULLY DEBUGGED VERSION 1.2 - All bugs fixed
+V 2.0
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
@@ -15,6 +15,11 @@ from functools import wraps
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///seating.db')
+
+# Fix for Render PostgreSQL URL
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
@@ -35,7 +40,8 @@ MAX_GUESTS = 250
 with app.app_context():
     db.create_all()
 
-# Admin decorator
+# ==================== DECORATORS ====================
+
 def require_admin(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -44,9 +50,10 @@ def require_admin(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Helper functions
+# ==================== HELPER FUNCTIONS ====================
+
 def get_table_status():
-    """Get status of all tables with occupancy info - OPTIMIZED"""
+    """Get status of all tables with occupancy info"""
     tables = []
     
     # Single query for all blocked tables
@@ -97,6 +104,10 @@ def validate_tickets(ticket_data):
         if not ticket_number or not full_name:
             return False, [], "All fields must be filled out"
         
+        # Validate ticket number is numeric only
+        if not ticket_number.isdigit():
+            return False, [], f"Ticket {ticket_number} is invalid. Ticket numbers must be numbers only (no letters or special characters)."
+        
         # Check for duplicates in current request
         if ticket_number in ticket_numbers_in_request:
             return False, [], f"Ticket {ticket_number} appears multiple times in your entry. Please remove duplicates."
@@ -123,7 +134,8 @@ def validate_tickets(ticket_data):
     
     return True, validated_guests, None
 
-# Routes
+# ==================== PUBLIC ROUTES ====================
+
 @app.route('/')
 def index():
     """Landing page - ticket entry"""
@@ -262,40 +274,81 @@ def confirmation():
     
     return render_template('confirmation.html', assignments=assignments)
 
-# Usher routes
+# ==================== USHER ROUTES ====================
+
 @app.route('/usher')
 def usher():
-    """Usher view - real-time table status"""
+    """Usher dashboard - real-time view"""
     return render_template('usher.html', total_tables=TOTAL_TABLES)
+
+@app.route('/api/usher/get-tables')
+def usher_get_tables():
+    """Get table status for ushers"""
+    try:
+        tables = get_table_status()
+        return jsonify({'success': True, 'tables': tables})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/usher/get-all-assignments')
+def usher_get_all_assignments():
+    """Get all assignments for ushers"""
+    try:
+        assignments = TableAssignment.query.order_by(
+            TableAssignment.table_number, 
+            TableAssignment.assigned_at
+        ).all()
+        
+        assignments_data = [{
+            'id': a.id,
+            'ticket_number': a.ticket_number,
+            'full_name': a.full_name,
+            'table_number': a.table_number,
+            'assigned_at': a.assigned_at.isoformat()
+        } for a in assignments]
+        
+        return jsonify({'success': True, 'assignments': assignments_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/usher/lookup-ticket')
 def usher_lookup_ticket():
     """Look up a ticket for ushers"""
     try:
-        ticket_number = request.args.get('ticket')
+        ticket_number = request.args.get('ticket', '').strip()
         
         if not ticket_number:
-            return jsonify({'success': False, 'error': 'Ticket number required'}), 400
+            return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
         
+        # Check if assigned
         assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
         
         if assignment:
             return jsonify({
                 'success': True,
+                'ticket_exists': True,
                 'found': True,
-                'assignment': assignment.to_dict()
+                'assignment': {
+                    'id': assignment.id,
+                    'ticket_number': assignment.ticket_number,
+                    'full_name': assignment.full_name,
+                    'table_number': assignment.table_number,
+                    'assigned_at': assignment.assigned_at.isoformat()
+                }
             })
         else:
             return jsonify({
                 'success': True,
+                'ticket_exists': False,
                 'found': False,
-                'message': f'Ticket {ticket_number} not found or not assigned'
+                'assignment': None
             })
-        
+            
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# Admin routes
+# ==================== ADMIN ROUTES ====================
+
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     """Admin login page"""
@@ -412,7 +465,7 @@ def unblock_table_api():
 def lookup_ticket():
     """Look up a ticket by number"""
     try:
-        ticket_number = request.args.get('ticket')
+        ticket_number = request.args.get('ticket', '').strip()
         
         if not ticket_number:
             return jsonify({'success': False, 'error': 'Ticket number required'}), 400
@@ -422,7 +475,8 @@ def lookup_ticket():
         if assignment:
             return jsonify({
                 'success': True,
-                'assignment': assignment.to_dict()
+                'assignment': assignment.to_dict(),
+                'ticket_exists': True
             })
         else:
             return jsonify({
@@ -440,11 +494,15 @@ def manual_assign_api():
     """Manually assign a guest to a table (even if blocked) - ADMIN ONLY"""
     try:
         table_number = request.json.get('table_number')
-        ticket_number = request.json.get('ticket_number')
-        full_name = request.json.get('full_name')
+        ticket_number = request.json.get('ticket_number', '').strip()
+        full_name = request.json.get('full_name', '').strip()
         
         if not table_number or not ticket_number or not full_name:
             return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        # Validate ticket number is numeric
+        if not ticket_number.isdigit():
+            return jsonify({'success': False, 'error': 'Ticket number must be numbers only'}), 400
         
         if table_number < 1 or table_number > TOTAL_TABLES:
             return jsonify({'success': False, 'error': 'Invalid table number'}), 400
@@ -517,6 +575,10 @@ def edit_assignment_api():
         
         # If changing ticket number, check if new ticket is available
         if new_ticket_number and new_ticket_number != old_ticket_number:
+            # Validate ticket number is numeric
+            if not new_ticket_number.isdigit():
+                return jsonify({'success': False, 'error': 'Ticket number must be numbers only'}), 400
+            
             existing = TableAssignment.query.filter_by(ticket_number=new_ticket_number).first()
             if existing:
                 return jsonify({
@@ -559,7 +621,7 @@ def edit_assignment_api():
 @app.route('/admin/reset-demo')
 @require_admin
 def reset_demo():
-    """Reset all assignments - KEEPS accepting any ticket numbers"""
+    """Reset all assignments"""
     try:
         # Delete all assignments
         TableAssignment.query.delete()
@@ -581,78 +643,26 @@ def reset_demo():
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ==================== USHER ROUTES (FIXED) ====================
+@app.route('/admin/reset-tickets')
+@require_admin
+def reset_tickets():
+    """Reset tickets - same as reset-demo for this system"""
+    return reset_demo()
 
-@app.route('/usher')
-def usher():
-    """Usher dashboard - real-time view"""
-    return render_template('usher.html', total_tables=TOTAL_TABLES)
+# ==================== WEBSOCKET EVENTS ====================
 
-@app.route('/api/usher/get-tables')
-def usher_get_tables():
-    """Get table status for ushers - REUSES ADMIN FUNCTION"""
-    try:
-        tables = get_table_status()
-        return jsonify({'success': True, 'tables': tables})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    print('Client connected')
+    emit('table_update', {'tables': get_table_status()})
 
-@app.route('/api/usher/get-all-assignments')
-def usher_get_all_assignments():
-    """Get all assignments for ushers - REUSES ADMIN FUNCTION"""
-    try:
-        assignments = TableAssignment.query.order_by(
-            TableAssignment.table_number, 
-            TableAssignment.assigned_at
-        ).all()
-        
-        assignments_data = [{
-            'id': a.id,
-            'ticket_number': a.ticket_number,
-            'full_name': a.full_name,
-            'table_number': a.table_number,
-            'assigned_at': a.assigned_at.isoformat()
-        } for a in assignments]
-        
-        return jsonify({'success': True, 'assignments': assignments_data})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    print('Client disconnected')
 
-@app.route('/api/usher/lookup-ticket')
-def usher_lookup_ticket():
-    """Look up a ticket for ushers - REUSES ADMIN FUNCTION"""
-    try:
-        ticket_number = request.args.get('ticket', '').strip()
-        
-        if not ticket_number:
-            return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
-        
-        # Check if assigned
-        assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
-        
-        if assignment:
-            return jsonify({
-                'success': True,
-                'ticket_exists': True,
-                'found': True,
-                'assignment': {
-                    'id': assignment.id,
-                    'ticket_number': assignment.ticket_number,
-                    'full_name': assignment.full_name,
-                    'table_number': assignment.table_number,
-                    'assigned_at': assignment.assigned_at.isoformat()
-                }
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'ticket_exists': False,
-                'found': False,
-                'assignment': None
-            })
-            
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+# ==================== RUN ====================
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
