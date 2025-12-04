@@ -46,15 +46,26 @@ def require_admin(f):
 
 # Helper functions
 def get_table_status():
-    """Get status of all tables with occupancy info"""
+    """Get status of all tables with occupancy info - OPTIMIZED"""
     tables = []
-    blocked_tables = {bt.table_number: bt.reason for bt in BlockedTable.query.all()}
     
+    # Single query for all blocked tables
+    blocked_dict = {bt.table_number: bt.reason for bt in BlockedTable.query.all()}
+    
+    # Single query for all assignments, organized by table
+    all_assignments = TableAssignment.query.all()
+    assignments_by_table = {}
+    for assignment in all_assignments:
+        if assignment.table_number not in assignments_by_table:
+            assignments_by_table[assignment.table_number] = []
+        assignments_by_table[assignment.table_number].append(assignment)
+    
+    # Build table status
     for table_num in range(1, TOTAL_TABLES + 1):
-        assignments = TableAssignment.query.filter_by(table_number=table_num).all()
+        assignments = assignments_by_table.get(table_num, [])
         occupied = len(assignments)
         available = SEATS_PER_TABLE - occupied
-        is_blocked = table_num in blocked_tables
+        is_blocked = table_num in blocked_dict
         
         occupants = [{
             'ticket': a.ticket_number,
@@ -68,7 +79,7 @@ def get_table_status():
             'available': available,
             'is_full': occupied >= SEATS_PER_TABLE,
             'is_blocked': is_blocked,
-            'block_reason': blocked_tables.get(table_num, ''),
+            'block_reason': blocked_dict.get(table_num, ''),
             'occupants': occupants
         })
     
