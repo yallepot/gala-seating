@@ -687,11 +687,14 @@ def upload_tickets():
 
 # ==================== INITIALIZE DATABASE ====================
 
-@app.before_first_request
-def create_tables():
-    """Create database tables"""
-    db.create_all()
-    print("Database tables created successfully!")
+def init_db():
+    """Initialize database tables"""
+    with app.app_context():
+        db.create_all()
+        print("Database tables created successfully!")
+
+# Call init_db when app starts
+init_db()
 
 # ==================== WEBSOCKET EVENTS ====================
 
