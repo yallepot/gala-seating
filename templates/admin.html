@@ -218,10 +218,26 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: 600;
+            margin-left: 5px;
         }
 
         .delete-btn:hover {
             background: #dc2626;
+        }
+
+        .edit-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .edit-btn:hover {
+            background: #5568d3;
         }
 
         .search-box {
@@ -347,7 +363,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h1>🎛️ Admin Control Panel</h1>
-                    <p>Manage seating assignments and table configuration</p>
+                    <p>Manage seating assignments and table configuration (Max {{ max_guests }} guests)</p>
                 </div>
                 <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
@@ -357,7 +373,7 @@
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-value" id="totalGuests">0</div>
-                <div class="stat-label">Total Guests Seated</div>
+                <div class="stat-label">Guests Registered (Max {{ max_guests }})</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="totalTables">{{ total_tables }}</div>
@@ -378,7 +394,6 @@
             <h2>🔧 System Controls</h2>
             <div class="button-group">
                 <button class="btn btn-danger" onclick="resetDemo()">Reset All Assignments</button>
-                <button class="btn btn-danger" onclick="resetTickets()">Reset Tickets (1-250)</button>
                 <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh Data</button>
             </div>
         </div>
@@ -414,7 +429,7 @@
                             <th>Ticket #</th>
                             <th>Guest Name</th>
                             <th>Assigned At</th>
-                            <th>Action</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="assignmentsBody">
@@ -475,6 +490,7 @@
         let socket;
         let selectedTableNumber = null;
         let tables = [];
+        const MAX_GUESTS = {{ max_guests }};
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -704,6 +720,16 @@
             document.getElementById('totalGuests').textContent = totalGuests;
             document.getElementById('availableSeats').textContent = availableSeats;
             document.getElementById('blockedTables').textContent = blockedCount;
+            
+            // Add capacity warning colors
+            const guestsStat = document.getElementById('totalGuests');
+            if (totalGuests >= MAX_GUESTS) {
+                guestsStat.style.color = '#ef4444';
+            } else if (totalGuests >= MAX_GUESTS - 20) {
+                guestsStat.style.color = '#f59e0b';
+            } else {
+                guestsStat.style.color = '#667eea';
+            }
         }
 
         // Load assignments
@@ -725,7 +751,7 @@
             const tbody = document.getElementById('assignmentsBody');
             
             if (assignments.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No assignments yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No assignments yet</td></tr>';
                 return;
             }
             
@@ -739,14 +765,14 @@
                     <td>${assignment.full_name}</td>
                     <td>${new Date(assignment.assigned_at).toLocaleString()}</td>
                     <td>
-                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; margin-right: 5px;" onclick="editAssignment(${assignment.id}, '${assignment.ticket_number}', '${assignment.full_name}', ${assignment.table_number})">Edit</button>
+                        <button class="edit-btn" onclick="editAssignment(${assignment.id}, '${assignment.ticket_number}', '${assignment.full_name.replace(/'/g, "\\'")}', ${assignment.table_number})">Edit</button>
                         <button class="delete-btn" onclick="deleteAssignment(${assignment.id})">Delete</button>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
         }
-        
+
         // Edit assignment
         function editAssignment(assignmentId, currentTicket, currentName, currentTable) {
             const newTicket = prompt(`Edit Ticket Number:\n\nCurrent: ${currentTicket}\n\nEnter new ticket number (or leave blank to keep current):`, currentTicket);
@@ -851,15 +877,9 @@
                             Table: <strong>Table ${data.assignment.table_number}</strong><br>
                             Assigned: ${new Date(data.assignment.assigned_at).toLocaleString()}
                         `;
-                    } else if (data.ticket_exists) {
-                        resultDiv.className = 'lookup-result';
-                        resultDiv.innerHTML = `
-                            <strong>⚠️ Ticket exists but not assigned</strong><br>
-                            Guest: ${data.guest_name}
-                        `;
                     } else {
                         resultDiv.className = 'lookup-result not-found';
-                        resultDiv.innerHTML = '<strong>❌ Ticket not found</strong>';
+                        resultDiv.innerHTML = '<strong>❌ Ticket not found or not yet assigned</strong>';
                     }
                 } else {
                     resultDiv.className = 'lookup-result not-found';
@@ -881,25 +901,6 @@
                 
                 if (data.success) {
                     alert('All assignments reset!');
-                    loadAllData();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            } catch (error) {
-                alert('Connection error');
-            }
-        }
-
-        // Reset tickets
-        async function resetTickets() {
-            if (!confirm('⚠️ Reset ALL tickets (1-250)? This will delete all assignments!')) return;
-            
-            try {
-                const response = await fetch('/admin/reset-tickets');
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(data.message);
                     loadAllData();
                 } else {
                     alert('Error: ' + data.error);
