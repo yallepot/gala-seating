@@ -5,72 +5,75 @@ FULLY DEBUGGED VERSION 1.2 - All bugs fixed
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
-from flask_cors import CORS
-from models import db, TableAssignment, BlockedTable
-from datetime import datetime, timedelta
-import os
+from datetime import datetime
 from functools import wraps
+import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///seating.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
-app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
-# Initialize extensions
-db.init_app(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
-CORS(app)
+# Fix for Render PostgreSQL URL
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Configuration
 TOTAL_TABLES = 25
 SEATS_PER_TABLE = 10
-MAX_GUESTS = 250
+TOTAL_TICKETS = 250
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
-# Create tables
+# Models
+class Ticket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_number = db.Column(db.String(50), unique=True, nullable=False)
+    full_name = db.Column(db.String(200), nullable=False)
+    is_used = db.Column(db.Boolean, default=False)
+    used_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class TableAssignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_number = db.Column(db.String(50), unique=True, nullable=False)
+    full_name = db.Column(db.String(200), nullable=False)
+    table_number = db.Column(db.Integer, nullable=False)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class BlockedTable(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    table_number = db.Column(db.Integer, unique=True, nullable=False)
+    reason = db.Column(db.String(200))
+    blocked_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Initialize database
 with app.app_context():
     db.create_all()
 
-# Admin decorator
-def require_admin(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('is_admin'):
-            return redirect(url_for('admin_login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Helper functions
+# Helper Functions
 def get_table_status():
-    """Get status of all tables with occupancy info - OPTIMIZED"""
+    """Get current status of all tables"""
     tables = []
+    blocked_tables = {bt.table_number: bt.reason for bt in BlockedTable.query.all()}
     
-    # Single query for all blocked tables
-    blocked_dict = {bt.table_number: bt.reason for bt in BlockedTable.query.all()}
-    
-    # Single query for all assignments, organized by table
-    all_assignments = TableAssignment.query.all()
-    assignments_by_table = {}
-    for assignment in all_assignments:
-        if assignment.table_number not in assignments_by_table:
-            assignments_by_table[assignment.table_number] = []
-        assignments_by_table[assignment.table_number].append(assignment)
-    
-    # Build table status
     for table_num in range(1, TOTAL_TABLES + 1):
-        assignments = assignments_by_table.get(table_num, [])
+        assignments = TableAssignment.query.filter_by(table_number=table_num).all()
         occupied = len(assignments)
         available = SEATS_PER_TABLE - occupied
-        is_blocked = table_num in blocked_dict
+        is_blocked = table_num in blocked_tables
         
-        occupants = [{
-            'ticket': a.ticket_number,
-            'name': a.full_name
-        } for a in assignments]
+        occupants = []
+        for assignment in assignments:
+            occupants.append({
+                'ticket': assignment.ticket_number,
+                'name': assignment.full_name
+            })
         
         tables.append({
             'number': table_num,
@@ -79,14 +82,14 @@ def get_table_status():
             'available': available,
             'is_full': occupied >= SEATS_PER_TABLE,
             'is_blocked': is_blocked,
-            'block_reason': blocked_dict.get(table_num, ''),
+            'block_reason': blocked_tables.get(table_num, ''),
             'occupants': occupants
         })
     
     return tables
 
 def validate_tickets(ticket_data):
-    """Validate ticket numbers - accepts ANY ticket number, tracks up to 250 total guests"""
+    """Validate ticket numbers and check availability - INCLUDES DUPLICATE CHECK"""
     validated_guests = []
     ticket_numbers_in_request = []
     
@@ -103,30 +106,41 @@ def validate_tickets(ticket_data):
         
         ticket_numbers_in_request.append(ticket_number)
         
-        # Check if ticket is already assigned
-        existing_assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
-        if existing_assignment:
-            return False, [], f"Ticket {ticket_number} has already been assigned to Table {existing_assignment.table_number}"
+        # Check if ticket exists in database
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        
+        if not ticket:
+            return False, [], f"Ticket {ticket_number} is invalid or does not exist"
+        
+        # Check if ticket is already used/assigned
+        if ticket.is_used:
+            assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
+            if assignment:
+                return False, [], f"Ticket {ticket_number} has already been assigned to Table {assignment.table_number}"
+            else:
+                return False, [], f"Ticket {ticket_number} has already been used"
         
         validated_guests.append({
             'ticket_number': ticket_number,
-            'full_name': full_name
+            'full_name': full_name,
+            'original_name': ticket.full_name
         })
     
-    # Check total capacity (250 guests max)
-    current_total = TableAssignment.query.count()
-    new_total = current_total + len(validated_guests)
-    
-    if new_total > MAX_GUESTS:
-        remaining = MAX_GUESTS - current_total
-        return False, [], f"Only {remaining} spots remaining. You are trying to register {len(validated_guests)} tickets. The gala is limited to {MAX_GUESTS} guests."
-    
     return True, validated_guests, None
+
+def require_admin(f):
+    """Decorator to require admin authentication"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Routes
 @app.route('/')
 def index():
-    """Landing page - ticket entry"""
+    """Landing page for ticket entry"""
     session.clear()
     return render_template('index.html')
 
@@ -140,90 +154,80 @@ def validate_tickets_api():
             return jsonify({'success': False, 'error': 'No tickets provided'}), 400
         
         # Validate tickets
-        is_valid, validated_guests, error = validate_tickets(tickets)
+        is_valid, validated_guests, error_msg = validate_tickets(tickets)
         
         if not is_valid:
-            return jsonify({'success': False, 'error': error}), 400
+            return jsonify({'success': False, 'error': error_msg}), 400
         
         # Store in session
         session['guests'] = validated_guests
-        session.permanent = True
+        session['ticket_numbers'] = [g['ticket_number'] for g in validated_guests]
         
         return jsonify({
             'success': True,
-            'redirect': '/select-seats'
+            'redirect': url_for('seating')
         })
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/select-seats')
-def select_seats():
+@app.route('/seating')
+def seating():
     """Seating selection page"""
-    guests = session.get('guests', [])
-    
-    if not guests:
+    if 'guests' not in session:
         return redirect(url_for('index'))
     
+    guests = session.get('guests', [])
     return render_template('seating.html', guests=guests)
 
 @app.route('/api/get-tables')
 def get_tables_api():
-    """Get all tables status"""
+    """API endpoint to get table status"""
     try:
         tables = get_table_status()
-        return jsonify({'success': True, 'tables': tables})
+        return jsonify({
+            'success': True,
+            'tables': tables
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/assign-seats', methods=['POST'])
 def assign_seats_api():
-    """Assign seats to guests"""
+    """API endpoint to assign seats"""
     try:
+        if 'guests' not in session:
+            return jsonify({'success': False, 'error': 'Session expired. Please start over.'}), 400
+        
         assignments = request.json.get('assignments', [])
         
         if not assignments:
             return jsonify({'success': False, 'error': 'No assignments provided'}), 400
         
-        # Verify session
-        guests = session.get('guests', [])
-        if not guests:
-            return jsonify({'success': False, 'error': 'Session expired. Please start over.'}), 400
+        # Validate all assignments first
+        for assignment in assignments:
+            ticket_number = assignment.get('ticket_number')
+            table_number = assignment.get('table_number')
+            
+            # Check if ticket is in session
+            if ticket_number not in session.get('ticket_numbers', []):
+                return jsonify({'success': False, 'error': f'Invalid ticket {ticket_number}'}), 400
+            
+            # Check table capacity
+            current_occupancy = TableAssignment.query.filter_by(table_number=table_number).count()
+            if current_occupancy >= SEATS_PER_TABLE:
+                return jsonify({'success': False, 'error': f'Table {table_number} is now full'}), 400
+            
+            # Check if table is blocked
+            blocked = BlockedTable.query.filter_by(table_number=table_number).first()
+            if blocked:
+                return jsonify({'success': False, 'error': f'Table {table_number} is blocked'}), 400
         
-        # Check total capacity
-        current_total = TableAssignment.query.count()
-        new_total = current_total + len(assignments)
-        
-        if new_total > MAX_GUESTS:
-            remaining = MAX_GUESTS - current_total
-            return jsonify({
-                'success': False,
-                'error': f'Only {remaining} spots remaining. The gala is limited to {MAX_GUESTS} guests.'
-            }), 400
-        
-        # Validate and create assignments
-        created_assignments = []
-        
+        # All validations passed, now create assignments
         for assignment in assignments:
             ticket_number = assignment.get('ticket_number')
             full_name = assignment.get('full_name')
             table_number = assignment.get('table_number')
-            
-            # Check if already assigned
-            existing = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
-            if existing:
-                return jsonify({
-                    'success': False,
-                    'error': f'Ticket {ticket_number} is already assigned'
-                }), 400
-            
-            # Check table capacity
-            table_count = TableAssignment.query.filter_by(table_number=table_number).count()
-            if table_count >= SEATS_PER_TABLE:
-                return jsonify({
-                    'success': False,
-                    'error': f'Table {table_number} is full'
-                }), 400
             
             # Create assignment
             new_assignment = TableAssignment(
@@ -232,21 +236,25 @@ def assign_seats_api():
                 table_number=table_number
             )
             db.session.add(new_assignment)
-            created_assignments.append({
-                'ticket_number': ticket_number,
-                'full_name': full_name,
-                'table_number': table_number
-            })
+            
+            # Mark ticket as used
+            ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+            if ticket:
+                ticket.is_used = True
+                ticket.used_at = datetime.utcnow()
         
         db.session.commit()
         
-        # Store in session for confirmation page
-        session['final_assignments'] = created_assignments
+        # Store assignments in session for confirmation page
+        session['confirmed_assignments'] = assignments
         
-        # Broadcast update via WebSocket
+        # Broadcast table update via WebSocket
         socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
-        return jsonify({'success': True})
+        return jsonify({
+            'success': True,
+            'message': 'Seats assigned successfully'
+        })
         
     except Exception as e:
         db.session.rollback()
@@ -255,101 +263,92 @@ def assign_seats_api():
 @app.route('/confirmation')
 def confirmation():
     """Confirmation page"""
-    assignments = session.get('final_assignments', [])
-    
-    if not assignments:
+    if 'confirmed_assignments' not in session:
         return redirect(url_for('index'))
     
+    assignments = session.get('confirmed_assignments', [])
     return render_template('confirmation.html', assignments=assignments)
 
-# Usher routes
-@app.route('/usher')
-def usher():
-    """Usher view - real-time table status"""
-    return render_template('usher.html', total_tables=TOTAL_TABLES)
-
-@app.route('/api/usher/lookup-ticket')
-def usher_lookup_ticket():
-    """Look up a ticket for ushers"""
-    try:
-        ticket_number = request.args.get('ticket')
-        
-        if not ticket_number:
-            return jsonify({'success': False, 'error': 'Ticket number required'}), 400
-        
-        assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
-        
-        if assignment:
-            return jsonify({
-                'success': True,
-                'found': True,
-                'assignment': assignment.to_dict()
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'found': False,
-                'message': f'Ticket {ticket_number} not found or not assigned'
-            })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# Admin routes
+# Admin Routes
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     """Admin login page"""
-    if request.method == 'GET':
-        return render_template('admin_login.html')
+    if request.method == 'POST':
+        password = request.form.get('password')
+        
+        if password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin_panel'))
+        else:
+            return render_template('admin_login.html', error='Invalid password')
     
-    password = request.form.get('password')
-    
-    if password == app.config['ADMIN_PASSWORD']:
-        session['is_admin'] = True
-        session.permanent = True
-        return redirect(url_for('admin_panel'))
-    
-    return render_template('admin_login.html', error='Invalid password')
+    return render_template('admin_login.html')
 
 @app.route('/admin/logout')
 def admin_logout():
     """Admin logout"""
-    session.pop('is_admin', None)
+    session.pop('admin_logged_in', None)
     return redirect(url_for('index'))
 
 @app.route('/admin')
 @require_admin
 def admin_panel():
     """Admin control panel"""
-    return render_template('admin.html', total_tables=TOTAL_TABLES, max_guests=MAX_GUESTS)
+    return render_template('admin.html', total_tables=TOTAL_TABLES)
 
 @app.route('/api/admin/get-all-assignments')
 @require_admin
-def get_all_assignments():
-    """Get all seat assignments"""
+def get_all_assignments_api():
+    """Get all seat assignments for admin"""
     try:
         assignments = TableAssignment.query.order_by(TableAssignment.table_number, TableAssignment.assigned_at).all()
+        
+        assignments_data = []
+        for assignment in assignments:
+            assignments_data.append({
+                'id': assignment.id,
+                'ticket_number': assignment.ticket_number,
+                'full_name': assignment.full_name,
+                'table_number': assignment.table_number,
+                'assigned_at': assignment.assigned_at.isoformat()
+            })
+        
         return jsonify({
             'success': True,
-            'assignments': [a.to_dict() for a in assignments]
+            'assignments': assignments_data
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/delete-any-assignment', methods=['POST'])
 @require_admin
-def delete_any_assignment():
-    """Delete any assignment by ID"""
+def delete_any_assignment_api():
+    """Delete any assignment - ADMIN ONLY"""
     try:
         assignment_id = request.json.get('assignment_id')
         
+        if not assignment_id:
+            return jsonify({'success': False, 'error': 'Assignment ID required'}), 400
+        
         assignment = TableAssignment.query.get(assignment_id)
+        
         if not assignment:
             return jsonify({'success': False, 'error': 'Assignment not found'}), 404
         
+        ticket_number = assignment.ticket_number
+        
+        # Delete assignment
         db.session.delete(assignment)
+        
+        # Free up ticket
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        if ticket:
+            ticket.is_used = False
+            ticket.used_at = None
+        
         db.session.commit()
         
+        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True})
@@ -361,22 +360,25 @@ def delete_any_assignment():
 @app.route('/api/admin/block-table', methods=['POST'])
 @require_admin
 def block_table_api():
-    """Block a table"""
+    """Block a table - ADMIN ONLY"""
     try:
         table_number = request.json.get('table_number')
         reason = request.json.get('reason', 'Reserved')
         
-        if table_number < 1 or table_number > TOTAL_TABLES:
+        if not table_number or table_number < 1 or table_number > TOTAL_TABLES:
             return jsonify({'success': False, 'error': 'Invalid table number'}), 400
         
+        # Check if already blocked
         existing = BlockedTable.query.filter_by(table_number=table_number).first()
         if existing:
             return jsonify({'success': False, 'error': 'Table already blocked'}), 400
         
+        # Create block
         blocked = BlockedTable(table_number=table_number, reason=reason)
         db.session.add(blocked)
         db.session.commit()
         
+        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True})
@@ -388,17 +390,22 @@ def block_table_api():
 @app.route('/api/admin/unblock-table', methods=['POST'])
 @require_admin
 def unblock_table_api():
-    """Unblock a table"""
+    """Unblock a table - ADMIN ONLY"""
     try:
         table_number = request.json.get('table_number')
         
+        if not table_number:
+            return jsonify({'success': False, 'error': 'Table number required'}), 400
+        
         blocked = BlockedTable.query.filter_by(table_number=table_number).first()
+        
         if not blocked:
-            return jsonify({'success': False, 'error': 'Table not blocked'}), 404
+            return jsonify({'success': False, 'error': 'Table is not blocked'}), 404
         
         db.session.delete(blocked)
         db.session.commit()
         
+        # Broadcast update
         socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({'success': True})
@@ -409,29 +416,113 @@ def unblock_table_api():
 
 @app.route('/api/admin/lookup-ticket')
 @require_admin
-def lookup_ticket():
-    """Look up a ticket by number"""
+def lookup_ticket_api():
+    """Look up ticket information - ADMIN ONLY"""
     try:
-        ticket_number = request.args.get('ticket')
+        ticket_number = request.args.get('ticket', '').strip()
         
         if not ticket_number:
             return jsonify({'success': False, 'error': 'Ticket number required'}), 400
         
+        # Check if ticket exists
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        
+        if not ticket:
+            return jsonify({
+                'success': True,
+                'ticket_exists': False,
+                'assignment': None
+            })
+        
+        # Check if assigned
         assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
         
         if assignment:
             return jsonify({
                 'success': True,
-                'assignment': assignment.to_dict()
+                'ticket_exists': True,
+                'assignment': {
+                    'ticket_number': assignment.ticket_number,
+                    'full_name': assignment.full_name,
+                    'table_number': assignment.table_number,
+                    'assigned_at': assignment.assigned_at.isoformat()
+                }
             })
         else:
             return jsonify({
                 'success': True,
-                'assignment': None,
-                'ticket_exists': False
+                'ticket_exists': True,
+                'guest_name': ticket.full_name,
+                'assignment': None
             })
         
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/reset-demo', methods=['GET'])
+@require_admin
+def reset_demo():
+    """Reset all assignments - ADMIN ONLY"""
+    try:
+        # Delete all assignments
+        TableAssignment.query.delete()
+        
+        # Delete all blocked tables
+        BlockedTable.query.delete()
+        
+        # Reset all tickets
+        tickets = Ticket.query.all()
+        for ticket in tickets:
+            ticket.is_used = False
+            ticket.used_at = None
+        
+        db.session.commit()
+        
+        # Broadcast update
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
+        
+        return jsonify({'success': True, 'message': 'All assignments reset'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/reset-tickets', methods=['GET'])
+@require_admin
+def reset_tickets():
+    """Reset all tickets to 1-250 - ADMIN ONLY"""
+    try:
+        # Delete all existing tickets
+        Ticket.query.delete()
+        
+        # Delete all assignments
+        TableAssignment.query.delete()
+        
+        # Delete all blocked tables
+        BlockedTable.query.delete()
+        
+        # Create new tickets 1-250 (but they can be any number from 1-1000)
+        # For initialization, we'll create tickets 1-250
+        for i in range(1, TOTAL_TICKETS + 1):
+            ticket = Ticket(
+                ticket_number=str(i),
+                full_name=f"Guest {i}",
+                is_used=False
+            )
+            db.session.add(ticket)
+        
+        db.session.commit()
+        
+        # Broadcast update
+        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
+        
+        return jsonify({
+            'success': True,
+            'message': f'All tickets reset! Created tickets 1-{TOTAL_TICKETS}. Admins can add tickets with any number 1-1000.'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/manual-assign', methods=['POST'])
@@ -465,14 +556,6 @@ def manual_assign_api():
                 'error': f'Table {table_number} is full ({current_count}/{SEATS_PER_TABLE})'
             }), 400
         
-        # Check total capacity
-        total_guests = TableAssignment.query.count()
-        if total_guests >= MAX_GUESTS:
-            return jsonify({
-                'success': False,
-                'error': f'Gala is at maximum capacity ({MAX_GUESTS} guests)'
-            }), 400
-        
         # Create assignment
         new_assignment = TableAssignment(
             ticket_number=ticket_number,
@@ -480,6 +563,22 @@ def manual_assign_api():
             table_number=table_number
         )
         db.session.add(new_assignment)
+        
+        # Mark ticket as used if it exists, or create it if it doesn't
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        if ticket:
+            ticket.is_used = True
+            ticket.used_at = datetime.utcnow()
+        else:
+            # Create ticket if it doesn't exist (for manual entries)
+            new_ticket = Ticket(
+                ticket_number=ticket_number,
+                full_name=full_name,
+                is_used=True,
+                used_at=datetime.utcnow()
+            )
+            db.session.add(new_ticket)
+        
         db.session.commit()
         
         # Broadcast update
@@ -497,7 +596,7 @@ def manual_assign_api():
 @app.route('/api/admin/edit-assignment', methods=['POST'])
 @require_admin
 def edit_assignment_api():
-    """Edit an existing assignment - change ticket number, name, or table"""
+    """Edit an existing assignment - change ticket number, name, or table - ADMIN ONLY"""
     try:
         assignment_id = request.json.get('assignment_id')
         new_ticket_number = request.json.get('ticket_number', '').strip()
@@ -523,6 +622,27 @@ def edit_assignment_api():
                     'success': False,
                     'error': f'Ticket {new_ticket_number} is already assigned to Table {existing.table_number}'
                 }), 400
+            
+            # Free up old ticket
+            old_ticket = Ticket.query.filter_by(ticket_number=old_ticket_number).first()
+            if old_ticket:
+                old_ticket.is_used = False
+                old_ticket.used_at = None
+            
+            # Mark new ticket as used or create it
+            new_ticket = Ticket.query.filter_by(ticket_number=new_ticket_number).first()
+            if new_ticket:
+                new_ticket.is_used = True
+                new_ticket.used_at = datetime.utcnow()
+            else:
+                # Create ticket if doesn't exist
+                created_ticket = Ticket(
+                    ticket_number=new_ticket_number,
+                    full_name=new_full_name if new_full_name else assignment.full_name,
+                    is_used=True,
+                    used_at=datetime.utcnow()
+                )
+                db.session.add(created_ticket)
             
             assignment.ticket_number = new_ticket_number
         
@@ -556,30 +676,56 @@ def edit_assignment_api():
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/admin/reset-demo')
+@app.route('/api/admin/add-ticket', methods=['POST'])
 @require_admin
-def reset_demo():
-    """Reset all assignments - KEEPS accepting any ticket numbers"""
+def add_ticket_api():
+    """Add a new ticket manually - ADMIN ONLY - ticket numbers can be 1-1000"""
     try:
-        # Delete all assignments
-        TableAssignment.query.delete()
+        ticket_number = request.json.get('ticket_number', '').strip()
+        full_name = request.json.get('full_name', '').strip()
         
-        # Unblock all tables
-        BlockedTable.query.delete()
+        if not ticket_number or not full_name:
+            return jsonify({'success': False, 'error': 'Ticket number and name required'}), 400
         
+        # Validate ticket number is within range
+        try:
+            ticket_num = int(ticket_number)
+            if ticket_num < 1 or ticket_num > 1000:
+                return jsonify({'success': False, 'error': 'Ticket number must be between 1 and 1000'}), 400
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Ticket number must be a valid number'}), 400
+        
+        # Check if ticket already exists
+        existing = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        if existing:
+            return jsonify({'success': False, 'error': f'Ticket {ticket_number} already exists'}), 400
+        
+        # Create ticket
+        new_ticket = Ticket(
+            ticket_number=ticket_number,
+            full_name=full_name,
+            is_used=False
+        )
+        db.session.add(new_ticket)
         db.session.commit()
-        
-        # Broadcast update
-        socketio.emit('table_update', {'tables': get_table_status()}, namespace='/')
         
         return jsonify({
             'success': True,
-            'message': f'All assignments and blocks reset. System ready to accept any ticket numbers (up to {MAX_GUESTS} total guests).'
+            'message': f'Ticket {ticket_number} added successfully'
         })
         
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# WebSocket Events
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    emit('table_update', {'tables': get_table_status()})
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
 
 # ==================== USHER ROUTES ====================
 
@@ -659,6 +805,3 @@ def usher_lookup_ticket():
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
