@@ -581,5 +581,84 @@ def reset_demo():
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ==================== USHER ROUTES ====================
+
+@app.route('/usher')
+def usher_dashboard():
+    """Usher dashboard - no authentication required"""
+    return render_template('usher.html')
+
+@app.route('/api/usher/get-tables')
+def usher_get_tables():
+    """Get table status for ushers"""
+    try:
+        tables = get_table_status()
+        return jsonify({'success': True, 'tables': tables})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/usher/get-all-assignments')
+def usher_get_all_assignments():
+    """Get all assignments for ushers"""
+    try:
+        assignments = TableAssignment.query.order_by(
+            TableAssignment.table_number, 
+            TableAssignment.assigned_at
+        ).all()
+        
+        assignments_data = [{
+            'ticket_number': a.ticket_number,
+            'full_name': a.full_name,
+            'table_number': a.table_number,
+            'assigned_at': a.assigned_at.isoformat()
+        } for a in assignments]
+        
+        return jsonify({'success': True, 'assignments': assignments_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/usher/lookup-ticket')
+def usher_lookup_ticket():
+    """Look up a ticket for ushers"""
+    try:
+        ticket_number = request.args.get('ticket', '').strip()
+        
+        if not ticket_number:
+            return jsonify({'success': False, 'error': 'No ticket number provided'}), 400
+        
+        # Check if ticket exists
+        ticket = Ticket.query.filter_by(ticket_number=ticket_number).first()
+        
+        # Check if assigned
+        assignment = TableAssignment.query.filter_by(ticket_number=ticket_number).first()
+        
+        if assignment:
+            return jsonify({
+                'success': True,
+                'ticket_exists': True,
+                'assignment': {
+                    'ticket_number': assignment.ticket_number,
+                    'full_name': assignment.full_name,
+                    'table_number': assignment.table_number,
+                    'assigned_at': assignment.assigned_at.isoformat()
+                }
+            })
+        elif ticket:
+            return jsonify({
+                'success': True,
+                'ticket_exists': True,
+                'guest_name': ticket.full_name,
+                'assignment': None
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'ticket_exists': False,
+                'assignment': None
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
